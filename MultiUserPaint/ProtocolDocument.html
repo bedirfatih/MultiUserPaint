@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MultiUserPaint — Protokol Dokümanı</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 11pt;
+    color: #1a1a1a;
+    background: #fff;
+    padding: 40px;
+    max-width: 960px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+  h1 { font-size: 22pt; color: #1a3c6e; border-bottom: 3px solid #1a3c6e; padding-bottom: 8px; margin-bottom: 20px; }
+  h2 { font-size: 15pt; color: #1a3c6e; border-bottom: 1px solid #c0cfe0; padding-bottom: 4px; margin-top: 36px; margin-bottom: 12px; }
+  h3 { font-size: 12pt; color: #2a5298; margin-top: 20px; margin-bottom: 8px; }
+  p  { margin-bottom: 10px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 10pt;
+  }
+  th {
+    background: #1a3c6e;
+    color: #fff;
+    padding: 7px 10px;
+    text-align: left;
+  }
+  td {
+    padding: 6px 10px;
+    border: 1px solid #c8d8e8;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f0f5fb; }
+  .frame {
+    font-family: 'Courier New', monospace;
+    font-size: 10pt;
+    background: #f4f7fb;
+    border: 1px solid #b0c4de;
+    border-radius: 4px;
+    padding: 14px;
+    margin: 12px 0;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .fsm {
+    font-family: 'Courier New', monospace;
+    font-size: 9.5pt;
+    background: #f9fbfd;
+    border: 1px solid #b0c4de;
+    border-left: 4px solid #1a3c6e;
+    border-radius: 4px;
+    padding: 14px;
+    margin: 12px 0;
+    white-space: pre;
+    line-height: 1.5;
+  }
+  .seq {
+    font-family: 'Courier New', monospace;
+    font-size: 9.5pt;
+    background: #f9fbfd;
+    border: 1px solid #b0c4de;
+    border-radius: 4px;
+    padding: 14px;
+    margin: 12px 0;
+    white-space: pre;
+    line-height: 1.7;
+  }
+  .note {
+    background: #fff8dc;
+    border-left: 4px solid #f0a500;
+    padding: 10px 14px;
+    margin: 12px 0;
+    border-radius: 2px;
+    font-size: 10pt;
+  }
+  .cover {
+    text-align: center;
+    padding: 60px 0 40px;
+    border-bottom: 2px solid #1a3c6e;
+    margin-bottom: 30px;
+  }
+  .cover h1 { border: none; font-size: 26pt; }
+  .cover .sub { font-size: 13pt; color: #555; margin-top: 10px; }
+  .cover .meta { font-size: 11pt; color: #333; margin-top: 30px; line-height: 2; }
+  .toc a { color: #1a3c6e; text-decoration: none; }
+  .toc li { margin: 4px 0; }
+  .tag { display: inline-block; background: #1a3c6e; color: #fff; border-radius: 3px; padding: 1px 7px; font-size: 9pt; margin-right: 4px; }
+  .tag.cs { background: #2e7d32; }
+  .tag.sc { background: #6a1b9a; }
+  @media print {
+    body { padding: 20px; }
+    h2 { page-break-before: always; }
+    .frame, .fsm, .seq { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ======================================================== KAPAK -->
+<div class="cover">
+  <h1>MultiUserPaint</h1>
+  <div class="sub">Çok Kullanıcılı Resim Çizme Uygulaması</div>
+  <div class="sub" style="font-size:12pt; color:#888;">Uygulama Katmanı İletişim Protokolü Dokümanı</div>
+  <div class="meta">
+    <strong>Ders:</strong> Bilgisayar Ağları / Ağ İletişimi<br>
+    <strong>Proje:</strong> PROJE 1 — Çok Kullanıcılı Resim Çizme Uygulaması<br>
+    <strong>Transport Katmanı:</strong> TCP (Transmission Control Protocol)<br>
+    <strong>Doküman Versiyonu:</strong> 1.0
+  </div>
+</div>
+
+<!-- ======================================================== İÇİNDEKİLER -->
+<h2>İçindekiler</h2>
+<ol class="toc">
+  <li><a href="#s1">Protokole Genel Bakış</a></li>
+  <li><a href="#s2">Wire Frame Formatı</a></li>
+  <li><a href="#s3">Mesaj Kataloğu — Tüm Mesaj Tipleri</a></li>
+  <li><a href="#s4">Mesaj Payload Şemaları</a></li>
+  <li><a href="#s5">Sunucu Sonlu Durum Makinası (FSM)</a></li>
+  <li><a href="#s6">İstemci Sonlu Durum Makinası (FSM)</a></li>
+  <li><a href="#s7">Senaryo Diyagramları</a></li>
+  <li><a href="#s8">Hata Kodları</a></li>
+</ol>
+
+<!-- ======================================================== 1 -->
+<h2 id="s1">1. Protokole Genel Bakış</h2>
+
+<p>
+MultiUserPaint Uygulama Protokolü (kısaca <strong>MAP</strong>), birden fazla kullanıcının aynı anda ortak bir çizim tuvali üzerinde çalışmasına olanak tanıyan, istemci-sunucu mimarisine dayalı bir uygulama katmanı protokolüdür.
+</p>
+
+<h3>1.1 Tasarım Kararları</h3>
+<table>
+  <tr><th>Konu</th><th>Karar</th><th>Gerekçe</th></tr>
+  <tr><td>Transport katmanı</td><td>TCP</td><td>Çizim verisi sıralı ve kayıpsız iletilmelidir. Piksel kaybı görsel bozulmaya neden olur.</td></tr>
+  <tr><td>Mesaj çerçeveleme</td><td>Binary, sabit başlık + değişken payload</td><td>JSON/metin tabanlı protokoller büyük piksel verisi için verimsizdir. Binary kodlama hem kompakt hem de hızlıdır.</td></tr>
+  <tr><td>Byte sırası</td><td>Big-endian (network byte order)</td><td>Ağ standartlarıyla uyumluluk; platform bağımsızlığı.</td></tr>
+  <tr><td>Sunucu mimarisi</td><td>Non-blocking I/O (Selector)</td><td>Tek thread ile çok sayıda istemciyi yönetmek için bloklanmayan G/Ç gereklidir.</td></tr>
+  <tr><td>Kimlik doğrulama</td><td>Kullanıcı adı tabanlı</td><td>Proje kapsamı dahilinde basit ve işlevsel.</td></tr>
+</table>
+
+<h3>1.2 Mimari</h3>
+<p>
+Sistemde bir <strong>sunucu</strong> ve birden fazla <strong>istemci</strong> bulunur. İstemciler birbirleriyle doğrudan iletişim kurmaz; tüm mesajlar sunucu üzerinden iletilir (merkezi model). Sunucu durum bilgisini saklar: bağlı kullanıcılar, paylaşılan dosyalar ve her kullanıcının pano verisi sunucuda tutulur.
+</p>
+<div class="frame">
+  ┌────────────┐        TCP        ┌─────────────────┐        TCP        ┌────────────┐
+  │  İstemci A │ ◄───────────────► │     SUNUCU      │ ◄───────────────► │  İstemci B │
+  └────────────┘                   │  (MAP Protokolü)│                   └────────────┘
+                                   │                 │
+                                   │  ┌───────────┐  │
+                                   │  │ Dosya     │  │
+                                   │  │ Deposu    │  │
+                                   │  └───────────┘  │
+                                   └─────────────────┘</div>
+
+<!-- ======================================================== 2 -->
+<h2 id="s2">2. Wire Frame Formatı</h2>
+
+<p>
+Her MAP mesajı aşağıdaki sabit başlık ile başlar ve ardından değişken uzunluklu payload gelir. Başlık her zaman <strong>8 bayttır</strong>.
+</p>
+
+<div class="frame">
+ 0        1        2        3        4        5        6        7
+ ┌────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────┐
+ │ 0xCA   │ 0xFE   │ VER    │ TYPE   │ PAY_LEN (4 bayt, big-endian)      │
+ └────────┴────────┴────────┴────────┴────────┴────────┴────────┴────────┘
+ │◄── MAGIC (2 B) ──►│ (1B)  │ (1B)  │◄─────────── 4 bayt ─────────────►│
+
+ Devamında:
+ ┌─────────────────────────────────────────────────────────────────────────┐
+ │  PAYLOAD  (PAY_LEN bayt)                                                │
+ └─────────────────────────────────────────────────────────────────────────┘</div>
+
+<table>
+  <tr><th>Alan</th><th>Boyut</th><th>Değer / Açıklama</th></tr>
+  <tr><td><strong>MAGIC</strong></td><td>2 bayt</td><td>Sabit: 0xCAFE. Geçersiz MAGIC bağlantının anında kapatılmasına neden olur.</td></tr>
+  <tr><td><strong>VERSION</strong></td><td>1 bayt</td><td>Protokol versiyonu. Mevcut sürüm: 0x01. Gelecek sürümlerle geriye dönük uyumluluk için ayrılmıştır.</td></tr>
+  <tr><td><strong>TYPE</strong></td><td>1 bayt</td><td>Mesaj tipi kodu (Bölüm 3'e bakınız).</td></tr>
+  <tr><td><strong>PAY_LEN</strong></td><td>4 bayt</td><td>Payload uzunluğu (bayt). Big-endian işaretli tam sayı. Maksimum 1.048.576 (1 MB). Aşan mesajlar reddedilir.</td></tr>
+  <tr><td><strong>PAYLOAD</strong></td><td>PAY_LEN bayt</td><td>Mesaja özgü veri. TYPE = 0 ise payload boştur (PAY_LEN = 0).</td></tr>
+</table>
+
+<h3>2.1 String Kodlama Kuralı</h3>
+<p>
+Payload içindeki her metin değeri aşağıdaki şema ile kodlanır. Bu kural tüm payload tanımlarında geçerlidir:
+</p>
+<div class="frame">  ┌──────────┬────────────────────────────────┐
+  │ UZUNLUK  │ UTF-8 BAYTLARI                 │
+  │ 2 bayt   │ UZUNLUK kadar bayt             │
+  └──────────┴────────────────────────────────┘
+  Uzunluk: big-endian işaretsiz short (0–65535)</div>
+
+<!-- ======================================================== 3 -->
+<h2 id="s3">3. Mesaj Kataloğu</h2>
+
+<p>
+<span class="tag cs">C→S</span> İstemciden Sunucuya &nbsp;
+<span class="tag sc">S→C</span> Sunucudan İstemciye
+</p>
+
+<table>
+  <tr>
+    <th>Kod</th><th>İsim</th><th>Yön</th><th>Açıklama</th><th>Ön Koşul</th>
+  </tr>
+  <tr><td>0x01</td><td>LOGIN_REQ</td><td><span class="tag cs">C→S</span></td><td>Kullanıcı adıyla sisteme giriş isteği.</td><td>TCP bağlantısı kurulmuş olmalı.</td></tr>
+  <tr><td>0x02</td><td>LOGIN_OK</td><td><span class="tag sc">S→C</span></td><td>Giriş kabul edildi. Oturum kimliği ve sunucu saati gönderilir.</td><td>Geçerli LOGIN_REQ alınmış olmalı.</td></tr>
+  <tr><td>0x03</td><td>LOGIN_ERR</td><td><span class="tag sc">S→C</span></td><td>Giriş reddedildi. Hata kodu ve açıklama gönderilir.</td><td>Geçersiz veya çakışan LOGIN_REQ alınmış olmalı.</td></tr>
+  <tr><td>0x10</td><td>FILE_CREATE_REQ</td><td><span class="tag cs">C→S</span></td><td>Sunucuda yeni boş bir canvas dosyası oluşturma isteği.</td><td>Kullanıcı oturumu ACTIVE durumunda olmalı.</td></tr>
+  <tr><td>0x11</td><td>FILE_CREATE_OK</td><td><span class="tag sc">S→C</span></td><td>Dosya başarıyla oluşturuldu. Yeni dosya kimliği döndürülür.</td><td>Geçerli FILE_CREATE_REQ işlenmiş olmalı.</td></tr>
+  <tr><td>0x12</td><td>FILE_OPEN_REQ</td><td><span class="tag cs">C→S</span></td><td>Mevcut paylaşılan bir dosyanın içeriğini isteme.</td><td>Kullanıcı oturumu ACTIVE durumunda olmalı.</td></tr>
+  <tr><td>0x13</td><td>FILE_OPEN_DATA</td><td><span class="tag sc">S→C</span></td><td>İstenen dosyanın tüm piksel verisi, boyut bilgisi ve meta verisiyle birlikte gönderilir.</td><td>Geçerli FILE_OPEN_REQ alınmış ve dosya mevcut olmalı.</td></tr>
+  <tr><td>0x14</td><td>FILE_LIST_REQ</td><td><span class="tag cs">C→S</span></td><td>Sunucudaki tüm paylaşılan dosyaların listesini isteme.</td><td>Kullanıcı oturumu ACTIVE durumunda olmalı.</td></tr>
+  <tr><td>0x15</td><td>FILE_LIST_RESP</td><td><span class="tag sc">S→C</span></td><td>Sunucudaki tüm dosyaların meta veri listesi gönderilir.</td><td>Geçerli FILE_LIST_REQ alınmış olmalı.</td></tr>
+  <tr><td>0x16</td><td>FILE_SAVE_REQ</td><td><span class="tag cs">C→S</span></td><td>İstemcinin canvas içeriğini sunucuya kaydettirme isteği. Tam piksel verisi gönderilir.</td><td>Kullanıcı ilgili dosyayı açmış olmalı.</td></tr>
+  <tr><td>0x17</td><td>FILE_SAVE_OK</td><td><span class="tag sc">S→C</span></td><td>Kayıt işlemi başarıyla tamamlandı.</td><td>FILE_SAVE_REQ başarıyla işlenmiş olmalı.</td></tr>
+  <tr><td>0x18</td><td>FILE_DELETE_REQ</td><td><span class="tag cs">C→S</span></td><td>Dosya silme isteği. Yalnızca dosyanın sahibi silebilir.</td><td>Kullanıcı ilgili dosyanın sahibi olmalı.</td></tr>
+  <tr><td>0x19</td><td>FILE_DELETE_OK</td><td><span class="tag sc">S→C</span></td><td>Dosya başarıyla silindi.</td><td>Geçerli FILE_DELETE_REQ işlenmiş olmalı.</td></tr>
+  <tr><td>0x1A</td><td>FILE_DELETE_ERR</td><td><span class="tag sc">S→C</span></td><td>Silme isteği reddedildi. Kullanıcı sahip değil veya dosya bulunamadı.</td><td>Geçersiz FILE_DELETE_REQ alınmış olmalı.</td></tr>
+  <tr><td>0x20</td><td>DRAW_EVENT</td><td><span class="tag cs">C→S</span></td><td>Tek bir çizim komutu (araç tipi, renk, koordinatlar). Her mouse hareketi veya şekil tamamlandığında gönderilir.</td><td>İlgili dosya açık ve kullanıcı ACTIVE durumunda olmalı.</td></tr>
+  <tr><td>0x21</td><td>DRAW_BROADCAST</td><td><span class="tag sc">S→C</span></td><td>Sunucunun, bir istemciden aldığı çizim komutunu aynı dosyayı açık olan diğer istemcilere iletmesi.</td><td>En az bir başka istemci aynı dosyayı açmış olmalı.</td></tr>
+  <tr><td>0x30</td><td>CLIPBOARD_COPY</td><td><span class="tag cs">C→S</span></td><td>Seçilen bölgenin piksel verisi sunucuya gönderilir ve oturuma ait panoya kaydedilir.</td><td>Kullanıcı bir bölge seçmiş ve ilgili dosyayı açmış olmalı.</td></tr>
+  <tr><td>0x31</td><td>CLIPBOARD_PASTE_REQ</td><td><span class="tag cs">C→S</span></td><td>Kullanıcının sunucudaki panosundaki veriyi talep etmesi.</td><td>Daha önce CLIPBOARD_COPY veya CLIPBOARD_CUT gönderilmiş olmalı.</td></tr>
+  <tr><td>0x32</td><td>CLIPBOARD_DATA</td><td><span class="tag sc">S→C</span></td><td>Pano içeriğindeki piksel verisi istemciye gönderilir.</td><td>Geçerli CLIPBOARD_PASTE_REQ alınmış ve pano dolu olmalı.</td></tr>
+  <tr><td>0x33</td><td>CLIPBOARD_CUT</td><td><span class="tag cs">C→S</span></td><td>Seçilen bölgenin piksel verisi panoya kaydedilmek üzere sunucuya gönderilir. Bölgenin silinmesi istemci tarafında gerçekleşir.</td><td>Kullanıcı bir bölge seçmiş olmalı.</td></tr>
+  <tr><td>0x40</td><td>USER_JOIN</td><td><span class="tag sc">S→C</span></td><td>Yeni bir kullanıcı sisteme bağlandığında tüm aktif istemcilere yayınlanır.</td><td>Yeni kullanıcının LOGIN_OK alması.</td></tr>
+  <tr><td>0x41</td><td>USER_LEAVE</td><td><span class="tag sc">S→C</span></td><td>Bir kullanıcı ayrıldığında tüm aktif istemcilere yayınlanır.</td><td>Kullanıcının TCP bağlantısının kapanması.</td></tr>
+  <tr><td>0x42</td><td>USER_LIST_REQ</td><td><span class="tag cs">C→S</span></td><td>Şu an bağlı olan tüm kullanıcıların listesini isteme.</td><td>Kullanıcı ACTIVE durumunda olmalı.</td></tr>
+  <tr><td>0x43</td><td>USER_LIST_RESP</td><td><span class="tag sc">S→C</span></td><td>Aktif kullanıcı adlarının listesi gönderilir.</td><td>Geçerli USER_LIST_REQ alınmış olmalı.</td></tr>
+  <tr><td>0x50</td><td>AUTOSAVE_NOTIFY</td><td><span class="tag sc">S→C</span></td><td>Sunucunun periyodik otomatik kayıt yaptığını ilgili istemcilere bildirmesi.</td><td>Otomatik kayıt zamanlayıcısı tetiklenmiş olmalı.</td></tr>
+  <tr><td>0xF0</td><td>PING</td><td><span class="tag cs">C→S</span></td><td>Bağlantının canlı olduğunu doğrulamak için gönderilen canlılık sinyali.</td><td>Kullanıcı ACTIVE durumunda olmalı.</td></tr>
+  <tr><td>0xF1</td><td>PONG</td><td><span class="tag sc">S→C</span></td><td>PING mesajına yanıt.</td><td>PING alınmış olmalı.</td></tr>
+  <tr><td>0xFF</td><td>ERROR</td><td><span class="tag sc">S→C</span></td><td>Genel hata bildirimi. İnsan tarafından okunabilir açıklama içerir.</td><td>Herhangi bir işlem hatası.</td></tr>
+</table>
+
+<!-- ======================================================== 4 -->
+<h2 id="s4">4. Mesaj Payload Şemaları</h2>
+
+<div class="note">Tüm çok baytlı sayılar big-endian kodlamasını kullanır. Metin alanlarında Bölüm 2.1'deki String kodlama kuralı uygulanır.</div>
+
+<h3>LOGIN_REQ (0x01)</h3>
+<div class="frame">  ┌──────────────────────────────────────┐
+  │  kullanici_adi : STRING              │
+  └──────────────────────────────────────┘
+  Kural: 3–16 karakter, yalnızca [a–z A–Z 0–9 _]</div>
+
+<h3>LOGIN_OK (0x02)</h3>
+<div class="frame">  ┌────────────────────┬────────────────────────────────────┐
+  │  oturum_id         │  sunucu_saati                      │
+  │  4 bayt (int)      │  8 bayt (long, Unix epoch ms)      │
+  └────────────────────┴────────────────────────────────────┘</div>
+
+<h3>LOGIN_ERR (0x03)</h3>
+<div class="frame">  ┌────────────┬──────────────────────────────────────────┐
+  │  hata_kodu │  hata_mesaji : STRING                    │
+  │  1 bayt    │                                          │
+  └────────────┴──────────────────────────────────────────┘
+  Hata kodları: 0x01 = Kullanıcı adı alınmış
+                0x02 = Geçersiz karakterler
+                0x03 = Sunucu kapasitesi dolu</div>
+
+<h3>FILE_CREATE_REQ (0x10)</h3>
+<div class="frame">  ┌──────────────────────┬────────────────────┬────────────────────┐
+  │  dosya_adi : STRING  │  genislik (int)    │  yukseklik (int)   │
+  │                      │  4 bayt            │  4 bayt            │
+  └──────────────────────┴────────────────────┴────────────────────┘</div>
+
+<h3>FILE_CREATE_OK (0x11)</h3>
+<div class="frame">  ┌────────────────────┬──────────────────────────┐
+  │  dosya_id (int)    │  dosya_adi : STRING      │
+  │  4 bayt            │                          │
+  └────────────────────┴──────────────────────────┘</div>
+
+<h3>FILE_OPEN_REQ (0x12)</h3>
+<div class="frame">  ┌────────────────────┐
+  │  dosya_id (int)    │
+  │  4 bayt            │
+  └────────────────────┘</div>
+
+<h3>FILE_OPEN_DATA (0x13)</h3>
+<div class="frame">  ┌──────────┬──────────────┬──────────────┬──────────┬──────────┬────────────┬─────────────────┐
+  │ dosya_id │ dosya_adi    │ sahip_adi    │ genislik │ yukseklik│ veri_uzunlugu │ piksel_verisi    │
+  │ int (4B) │ STRING       │ STRING       │ int (4B) │ int (4B) │ int (4B)      │ veri_uzunlugu B  │
+  └──────────┴──────────────┴──────────────┴──────────┴──────────┴────────────┴─────────────────┘
+  piksel_verisi: Ham ARGB formatında piksel dizisi.
+                 Her piksel 4 bayttır: [A][R][G][B]
+                 Toplam boyut = genislik × yukseklik × 4 bayt</div>
+
+<h3>FILE_LIST_RESP (0x15)</h3>
+<div class="frame">  ┌───────────────┐
+  │ dosya_sayisi  │  ← 2 bayt (short)
+  │ (short)       │
+  └───────────────┘
+  Her dosya için (dosya_sayisi kez tekrar):
+  ┌──────────┬──────────────┬──────────────┬──────────┬──────────┬──────────────────────┐
+  │ dosya_id │ dosya_adi    │ sahip_adi    │ genislik │ yukseklik│ son_degistirilme      │
+  │ int (4B) │ STRING       │ STRING       │ int (4B) │ int (4B) │ long (8B, epoch ms)  │
+  └──────────┴──────────────┴──────────────┴──────────┴──────────┴──────────────────────┘</div>
+
+<h3>FILE_SAVE_REQ (0x16)</h3>
+<div class="frame">  ┌──────────┬────────────────┬─────────────────────────────┐
+  │ dosya_id │ veri_uzunlugu  │ piksel_verisi               │
+  │ int (4B) │ int (4B)       │ veri_uzunlugu bayt          │
+  └──────────┴────────────────┴─────────────────────────────┘</div>
+
+<h3>DRAW_EVENT (0x20) ve DRAW_BROADCAST (0x21)</h3>
+<div class="frame">  DRAW_EVENT payload:
+  ┌──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┐
+  │ dosya_id │ arac     │ renk     │ kalinlik │ x1       │ y1       │ x2       │ y2       │
+  │ int (4B) │ 1 bayt   │ int (4B) │short(2B) │ int (4B) │ int (4B) │ int (4B) │ int (4B) │
+  └──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┘
+
+  DRAW_BROADCAST payload (DRAW_EVENT'e ek olarak gönderen kullanıcı adı eklenir):
+  ┌──────────┬──────────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┐
+  │ dosya_id │ gonderen     │ arac     │ renk     │ kalinlik │ x1       │ y1       │ x2       │ y2       │
+  │ int (4B) │ STRING       │ 1 bayt   │ int (4B) │short(2B) │ int (4B) │ int (4B) │ int (4B) │ int (4B) │
+  └──────────┴──────────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┘
+
+  Araç kodları:  0x01 = Kalem   0x02 = Çizgi   0x03 = Dikdörtgen
+                 0x04 = Elips   0x05 = Dolgu    0x06 = Silgi
+  Renk: ARGB formatında 4 bayt (0xAARRGGBB)</div>
+
+<h3>CLIPBOARD_COPY / CLIPBOARD_CUT (0x30, 0x33)</h3>
+<div class="frame">  ┌──────────┬──────┬──────┬──────┬──────┬────────────────┬─────────────────────┐
+  │ dosya_id │ rx   │ ry   │ rw   │ rh   │ veri_uzunlugu  │ piksel_verisi       │
+  │ int (4B) │ int  │ int  │ int  │ int  │ int (4B)       │ veri_uzunlugu bayt  │
+  └──────────┴──────┴──────┴──────┴──────┴────────────────┴─────────────────────┘
+  rx, ry: Seçim bölgesinin sol üst köşesi (piksel)
+  rw, rh: Seçim genişliği ve yüksekliği (piksel)</div>
+
+<h3>CLIPBOARD_DATA (0x32)</h3>
+<div class="frame">  ┌──────────┬──────────┬────────────────┬─────────────────────┐
+  │ genislik │ yukseklik│ veri_uzunlugu  │ piksel_verisi       │
+  │ int (4B) │ int (4B) │ int (4B)       │ veri_uzunlugu bayt  │
+  └──────────┴──────────┴────────────────┴─────────────────────┘</div>
+
+<h3>USER_JOIN / USER_LEAVE (0x40, 0x41)</h3>
+<div class="frame">  ┌──────────────────────┬──────────────────────────────────────┐
+  │ kullanici_adi STRING │ zaman_damgasi (long, 8B, epoch ms)   │
+  └──────────────────────┴──────────────────────────────────────┘</div>
+
+<h3>AUTOSAVE_NOTIFY (0x50)</h3>
+<div class="frame">  ┌──────────┬──────────────────────────────────────┐
+  │ dosya_id │ zaman_damgasi (long, 8B, epoch ms)   │
+  │ int (4B) │                                      │
+  └──────────┴──────────────────────────────────────┘</div>
+
+<h3>ERROR (0xFF)</h3>
+<div class="frame">  ┌──────────────────────────────────────────────────┐
+  │  hata_mesaji : STRING                            │
+  └──────────────────────────────────────────────────┘</div>
+
+<h3>PING (0xF0), PONG (0xF1), FILE_SAVE_OK (0x17), FILE_DELETE_OK (0x19), CLIPBOARD_PASTE_REQ (0x31), USER_LIST_REQ (0x42), FILE_LIST_REQ (0x14), FILE_OPEN_REQ (0x12)</h3>
+<p>Bu mesajlar için ya payload boştur (PAY_LEN = 0) ya da yalnızca dosya_id içerir (4 bayt int).</p>
+
+<!-- ======================================================== 5 -->
+<h2 id="s5">5. Sunucu Sonlu Durum Makinası (FSM)</h2>
+
+<p>
+Sunucu, her TCP bağlantısı için bağımsız bir FSM örneği çalıştırır. Bir istemcinin durumu yalnızca o istemciye ait mesajlar tarafından değiştirilir.
+</p>
+
+<h3>5.1 Durum Diyagramı</h3>
+<div class="fsm">
+                           ┌─────────────────────────────────────────┐
+                           │                                         │
+                   TCP bağlantısı kuruldu                            │
+                           │                                         │
+                           ▼                                         │
+              ┌────────────────────────┐                             │
+              │       HANDSHAKE        │◄────────────────────┐       │
+              │  (Giriş Bekleniyor)    │                     │       │
+              └────────────────────────┘                     │       │
+                 │              │                  LOGIN_REQ  │       │
+    LOGIN_REQ    │              │ LOGIN_REQ         (kullanıcı│       │
+    (geçerli)   │              │ (ad alınmış       adı alınmış│       │
+                │              │  veya geçersiz)   veya geçers.│      │
+                │              │                             │       │
+                ▼              ▼                             │       │
+    ┌──────────────────┐  ┌──────────┐             Tekrar    │       │
+    │      ACTIVE       │  │ LOGIN_   │◄────────── denene    │       │
+    │  (Normal Çalışma) │  │  ERR     │            bilir     │       │
+    └──────────────────┘  │ gönderilir│                      │       │
+       │     │     │      └──────────┘                       │       │
+       │     │     │                                         │       │
+  DRAW_│  FILE│ FILE                                          │       │
+ EVENT │  LIST│ SAVE                                          │       │
+       │  REQ │ REQ                                           │       │
+       │     │     │                                         │       │
+       ▼     ▼     ▼                                         │       │
+    ACTIVE (işlem   ┌──────────┐                             │       │
+    devam eder)     │  SAVING  │                             │       │
+                    │ (Disk    │                             │       │
+                    │  Yazımı) │                             │       │
+                    └──────────┘                             │       │
+                         │                                   │       │
+              Yazım tamamlandı / hata                         │       │
+                         │                                   │       │
+                         ▼                                   │       │
+                      ACTIVE                                 │       │
+                                                             │       │
+   HANDSHAKE veya ACTIVE durumunda:                          │       │
+   - Geçersiz MAGIC → ERROR (bağlantı kapatılır)             │       │
+   - LOGIN_REQ dışı mesaj (HANDSHAKE'de) → ERROR             │       │
+                                                             │       │
+   ACTIVE durumunda TCP bağlantısı kapanırsa:                │       │
+         ▼                                                   │       │
+    ┌──────────┐                                             │       │
+    │ CLOSING  │ ── USER_LEAVE yayınla, kayıttan sil ────────┘       │
+    └──────────┘                                                     │
+         │                                                           │
+    ┌──────────┐                                                     │
+    │  ERROR   │ ── Kanal kapat ──────────────────────────────────────┘
+    └──────────┘</div>
+
+<h3>5.2 Sunucu Durum Geçiş Tablosu</h3>
+<table>
+  <tr><th>Mevcut Durum</th><th>Tetikleyen Olay</th><th>Yeni Durum</th><th>Gerçekleştirilen İşlemler</th></tr>
+  <tr>
+    <td>HANDSHAKE</td>
+    <td>LOGIN_REQ alındı, kullanıcı adı geçerli ve kullanılmıyor</td>
+    <td>ACTIVE</td>
+    <td>Kullanıcı adını kayıt et; LOGIN_OK gönder; tüm istemcilere USER_JOIN yayınla</td>
+  </tr>
+  <tr>
+    <td>HANDSHAKE</td>
+    <td>LOGIN_REQ alındı, kullanıcı adı kullanımda</td>
+    <td>HANDSHAKE</td>
+    <td>LOGIN_ERR(0x01) gönder; beklemeye devam et</td>
+  </tr>
+  <tr>
+    <td>HANDSHAKE</td>
+    <td>LOGIN_REQ alındı, kullanıcı adı geçersiz karakter içeriyor</td>
+    <td>HANDSHAKE</td>
+    <td>LOGIN_ERR(0x02) gönder; beklemeye devam et</td>
+  </tr>
+  <tr>
+    <td>HANDSHAKE</td>
+    <td>LOGIN_REQ dışında herhangi bir mesaj alındı</td>
+    <td>ERROR</td>
+    <td>ERROR mesajı gönder ("Önce giriş yapılmalı"); bağlantıyı kapat</td>
+  </tr>
+  <tr>
+    <td>ACTIVE</td>
+    <td>DRAW_EVENT alındı</td>
+    <td>ACTIVE</td>
+    <td>Aynı dosyayı açık olan diğer tüm oturumlara DRAW_BROADCAST ilet</td>
+  </tr>
+  <tr>
+    <td>ACTIVE</td>
+    <td>FILE_CREATE_REQ alındı</td>
+    <td>ACTIVE</td>
+    <td>Disk üzerinde yeni dosya oluştur; FILE_CREATE_OK gönder; tüm istemcilere FILE_LIST_RESP yayınla</td>
+  </tr>
+  <tr>
+    <td>ACTIVE</td>
+    <td>FILE_OPEN_REQ alındı, dosya mevcut</td>
+    <td>ACTIVE</td>
+    <td>Dosyayı diskten oku; FILE_OPEN_DATA gönder; oturum için açık dosyalar listesine ekle</td>
+  </tr>
+  <tr>
+    <td>ACTIVE</td>
+    <td>FILE_SAVE_REQ alındı</td>
+    <td>SAVING</td>
+    <td>Piksel verisini eş zamansız olarak diske yaz</td>
+  </tr>
+  <tr>
+    <td>SAVING</td>
+    <td>Disk yazımı tamamlandı</td>
+    <td>ACTIVE</td>
+    <td>FILE_SAVE_OK gönder; son değiştirme zamanını güncelle</td>
+  </tr>
+  <tr>
+    <td>SAVING</td>
+    <td>Disk yazımı başarısız</td>
+    <td>ACTIVE</td>
+    <td>ERROR mesajı gönder; hatayı kaydet</td>
+  </tr>
+  <tr>
+    <td>ACTIVE</td>
+    <td>FILE_DELETE_REQ alındı, istemci dosyanın sahibi</td>
+    <td>ACTIVE</td>
+    <td>Dosyayı diskten ve kayıtlardan sil; FILE_DELETE_OK gönder; güncel dosya listesini yayınla</td>
+  </tr>
+  <tr>
+    <td>ACTIVE</td>
+    <td>FILE_DELETE_REQ alındı, istemci dosyanın sahibi değil</td>
+    <td>ACTIVE</td>
+    <td>FILE_DELETE_ERR gönder</td>
+  </tr>
+  <tr>
+    <td>ACTIVE</td>
+    <td>CLIPBOARD_COPY veya CLIPBOARD_CUT alındı</td>
+    <td>ACTIVE</td>
+    <td>Piksel verisini oturuma ait panoya kaydet</td>
+  </tr>
+  <tr>
+    <td>ACTIVE</td>
+    <td>CLIPBOARD_PASTE_REQ alındı, pano dolu</td>
+    <td>ACTIVE</td>
+    <td>CLIPBOARD_DATA gönder</td>
+  </tr>
+  <tr>
+    <td>ACTIVE</td>
+    <td>CLIPBOARD_PASTE_REQ alındı, pano boş</td>
+    <td>ACTIVE</td>
+    <td>ERROR("Pano boş") gönder</td>
+  </tr>
+  <tr>
+    <td>ACTIVE</td>
+    <td>PING alındı</td>
+    <td>ACTIVE</td>
+    <td>PONG gönder; son canlılık zamanını güncelle</td>
+  </tr>
+  <tr>
+    <td>ACTIVE</td>
+    <td>TCP bağlantısı kapandı</td>
+    <td>CLOSING</td>
+    <td>Tüm istemcilere USER_LEAVE yayınla; oturumu kayıtlardan sil; kanalı kapat</td>
+  </tr>
+  <tr>
+    <td>ACTIVE</td>
+    <td>90 saniye boyunca PING gelmedi</td>
+    <td>CLOSING</td>
+    <td>Bağlantı zaman aşımı; USER_LEAVE yayınla; kanalı kapat</td>
+  </tr>
+  <tr>
+    <td>HANDSHAKE / ACTIVE</td>
+    <td>Geçersiz MAGIC baytı</td>
+    <td>ERROR</td>
+    <td>Kanalı hemen kapat; loglama yap</td>
+  </tr>
+</table>
+
+<!-- ======================================================== 6 -->
+<h2 id="s6">6. İstemci Sonlu Durum Makinası (FSM)</h2>
+
+<h3>6.1 Durum Diyagramı</h3>
+<div class="fsm">
+  ┌────────────────────┐
+  │   DISCONNECTED     │◄──────────────────────────────────────────────────┐
+  │   (Bağlı değil)    │                                                   │
+  └────────────────────┘                                                   │
+           │                                                               │
+   Kullanıcı "Bağlan"                                                      │
+   butonuna tıkladı                                                        │
+           │                                                               │
+           ▼                                                               │
+  ┌────────────────────┐                                                   │
+  │    CONNECTING      │── Bağlantı reddedildi / zaman aşımı ─────────────►│
+  │   (Bağlanıyor)     │                                                   │
+  └────────────────────┘                                                   │
+           │                                                               │
+  TCP bağlantısı kuruldu;                                                  │
+  LOGIN_REQ gönderildi                                                     │
+           │                                                               │
+           ▼                                                               │
+  ┌────────────────────┐                                                   │
+  │    LOGGING_IN      │── LOGIN_ERR alındı ──► kullanıcıya hata göster    │
+  │  (Giriş Bekleniyor)│   (kullanıcı yeniden deneyebilir)                 │
+  └────────────────────┘                                                   │
+           │                                                               │
+  LOGIN_OK alındı;                                                         │
+  FILE_LIST_REQ gönderildi                                                 │
+           │                                                               │
+           ▼                                                               │
+  ┌────────────────────┐                                                   │
+  │     CONNECTED      │── IOException (okuma/yazma hatası) ──►            │
+  │   (Bağlı, Aktif)   │                                                   │
+  └────────────────────┘           RECONNECTING ──► DISCONNECTED           │
+     │   │   │   │                                                         │
+  Her normal işlem                                               Bağlantı  │
+  (çizim, dosya, pano)                                           kurulamadı│
+  CONNECTED'de kalır                                                       │
+                                                                           │
+  Kullanıcı "Bağlantıyı Kes" seçerse:  ──────────────────────────────────►┘</div>
+
+<h3>6.2 İstemci Durum Geçiş Tablosu</h3>
+<table>
+  <tr><th>Mevcut Durum</th><th>Tetikleyen Olay</th><th>Yeni Durum</th><th>Gerçekleştirilen İşlemler</th></tr>
+  <tr>
+    <td>DISCONNECTED</td>
+    <td>Kullanıcı "Bağlan" tıkladı</td>
+    <td>CONNECTING</td>
+    <td>TCP bağlantısı girişimi başlat</td>
+  </tr>
+  <tr>
+    <td>CONNECTING</td>
+    <td>TCP bağlantısı başarıyla kuruldu</td>
+    <td>LOGGING_IN</td>
+    <td>LOGIN_REQ gönder (kullanıcı adıyla)</td>
+  </tr>
+  <tr>
+    <td>CONNECTING</td>
+    <td>Bağlantı reddedildi veya zaman aşımı</td>
+    <td>DISCONNECTED</td>
+    <td>Kullanıcıya hata iletişim kutusu göster</td>
+  </tr>
+  <tr>
+    <td>LOGGING_IN</td>
+    <td>LOGIN_OK alındı</td>
+    <td>CONNECTED</td>
+    <td>Oturum kimliğini kaydet; arayüzü etkinleştir; FILE_LIST_REQ gönder</td>
+  </tr>
+  <tr>
+    <td>LOGGING_IN</td>
+    <td>LOGIN_ERR alındı</td>
+    <td>LOGGING_IN</td>
+    <td>Kullanıcıya hata mesajı göster; farklı kullanıcı adıyla yeniden deneme imkânı sun</td>
+  </tr>
+  <tr>
+    <td>CONNECTED</td>
+    <td>Kullanıcı çizim yaptı</td>
+    <td>CONNECTED</td>
+    <td>DRAW_EVENT gönder; çizimi yerel tuvale uygula</td>
+  </tr>
+  <tr>
+    <td>CONNECTED</td>
+    <td>DRAW_BROADCAST alındı</td>
+    <td>CONNECTED</td>
+    <td>Gelen çizim komutunu ilgili açık tuvale uygula</td>
+  </tr>
+  <tr>
+    <td>CONNECTED</td>
+    <td>Kullanıcı dosya kaydet istedi</td>
+    <td>CONNECTED</td>
+    <td>Tuval piksel verisini al; FILE_SAVE_REQ gönder</td>
+  </tr>
+  <tr>
+    <td>CONNECTED</td>
+    <td>IOException (okuma veya yazma hatası)</td>
+    <td>DISCONNECTED</td>
+    <td>Kullanıcıya bağlantı kesildi uyarısı göster; arayüzü devre dışı bırak</td>
+  </tr>
+  <tr>
+    <td>CONNECTED</td>
+    <td>Kullanıcı "Bağlantıyı Kes" seçti</td>
+    <td>DISCONNECTED</td>
+    <td>TCP bağlantısını kapat</td>
+  </tr>
+</table>
+
+<!-- ======================================================== 7 -->
+<h2 id="s7">7. Senaryo Diyagramları</h2>
+
+<h3>7.1 Kullanıcı Giriş Senaryosu</h3>
+<div class="seq">  İstemci A                                Sunucu
+     │                                        │
+     │──── TCP SYN ──────────────────────────►│  TCP bağlantısı kurulur
+     │◄─── TCP SYN-ACK + ACK ─────────────────│
+     │                                        │  Oturum oluşturulur (HANDSHAKE)
+     │                                        │
+     │──── LOGIN_REQ("ali") ─────────────────►│  Kullanıcı adı kontrol edilir
+     │                                        │  Geçerli → Kayıt yapılır
+     │◄─── LOGIN_OK(sessionId=1) ─────────────│  Durum: HANDSHAKE → ACTIVE
+     │                                        │
+     │                              İstemci B │  (daha önce bağlı)
+     │                                        │──── USER_JOIN("ali") ────►│ İstemci B'ye bildirim
+     │                                        │
+     │──── FILE_LIST_REQ ────────────────────►│
+     │◄─── FILE_LIST_RESP([...]) ─────────────│</div>
+
+<h3>7.2 Eş Zamanlı Çizim Senaryosu</h3>
+<div class="seq">  İstemci A              Sunucu              İstemci B
+     │                      │                      │
+     │  (her ikisi de dosya_id=5'i açmış durumda)  │
+     │                      │                      │
+     │── DRAW_EVENT ────────►│                      │
+     │   (dosya_id=5,        │                      │
+     │    arac=KALEM,        │  Aynı dosyayı açık   │
+     │    renk=0xFF0000,     │  oturumlar bulunur   │
+     │    x1=10, y1=20,      │                      │
+     │    x2=15, y2=25)      │── DRAW_BROADCAST ───►│
+     │                      │   (dosya_id=5,        │  İstemci B tuvale
+     │                      │    gonderen="ali",    │  çizimi uygular
+     │                      │    ...)               │
+     │                      │                      │
+     │  İstemci B de çizim yapabilir:              │
+     │                      │◄─ DRAW_EVENT ─────────│
+     │◄─ DRAW_BROADCAST ────│   (dosya_id=5, ...)   │
+     │  İstemci A tuvale    │                      │
+     │  uygular             │                      │</div>
+
+<h3>7.3 Otomatik Kayıt Senaryosu</h3>
+<div class="seq">  İstemci A              Sunucu              İstemci B
+     │                      │                      │
+     │             [60 saniye zamanlayıcısı tetiklendi]
+     │                      │                      │
+     │                      │  Tüm açık dosyalar   │
+     │                      │  diske yazılır       │
+     │                      │                      │
+     │◄── AUTOSAVE_NOTIFY ──│                      │
+     │    (dosya_id=5,       │── AUTOSAVE_NOTIFY ──►│
+     │     zaman_damgasi)    │   (dosya_id=5,       │
+     │                      │    zaman_damgasi)    │
+     │  "Otomatik kaydedildi"│                    "Otomatik kaydedildi"
+     │  bilgisi gösterilir  │               bilgisi gösterilir</div>
+
+<h3>7.4 Pano (Kopyala / Yapıştır) Senaryosu</h3>
+<div class="seq">  İstemci A              Sunucu
+     │                      │
+     │  Kullanıcı bölge seçer ve "Kopyala" yapar
+     │                      │
+     │── CLIPBOARD_COPY ────►│  Piksel verisi oturuma ait
+     │   (dosya_id=5,        │  panoya kaydedilir
+     │    rx=50, ry=50,      │
+     │    rw=100, rh=80,     │
+     │    piksel_verisi)     │
+     │                      │
+     │  Kullanıcı "Yapıştır" yapar
+     │                      │
+     │── CLIPBOARD_PASTE_REQ►│  Pano verisi alınır
+     │                      │
+     │◄── CLIPBOARD_DATA ───│  Piksel verisi gönderilir
+     │    (genislik=100,     │
+     │     yukseklik=80,     │
+     │     piksel_verisi)    │
+     │                      │
+     │  Veri tuvale uygulanır│</div>
+
+<!-- ======================================================== 8 -->
+<h2 id="s8">8. Hata Kodları ve Hata Yönetimi</h2>
+
+<h3>8.1 LOGIN_ERR Hata Kodları</h3>
+<table>
+  <tr><th>Kod</th><th>Anlam</th><th>Önerilen İstemci Davranışı</th></tr>
+  <tr><td>0x01</td><td>Kullanıcı adı başka bir oturum tarafından kullanılıyor</td><td>Farklı kullanıcı adı ile yeniden deneme imkânı sun</td></tr>
+  <tr><td>0x02</td><td>Kullanıcı adı geçersiz karakter içeriyor veya uzunluk kuralına uymuyor</td><td>Kullanıcıya kural bilgisini göster; yeniden deneme imkânı sun</td></tr>
+  <tr><td>0x03</td><td>Sunucu maksimum bağlantı kapasitesine ulaştı</td><td>Daha sonra tekrar denenmesini öner</td></tr>
+</table>
+
+<h3>8.2 Genel Hata Durumları</h3>
+<table>
+  <tr><th>Durum</th><th>Sunucu Davranışı</th><th>İstemci Davranışı</th></tr>
+  <tr><td>Geçersiz MAGIC baytı alındı</td><td>Bağlantıyı derhal kapat; loglama yap</td><td>Bağlantı kesildi olarak değerlendir</td></tr>
+  <tr><td>Payload boyutu 1 MB sınırını aşıyor</td><td>Bağlantıyı kapat; güvenlik ihlali olarak logla</td><td>Bağlantı kesildi olarak değerlendir</td></tr>
+  <tr><td>HANDSHAKE durumunda LOGIN_REQ dışı mesaj</td><td>ERROR gönder; bağlantıyı kapat</td><td>Bağlantı kesildi olarak değerlendir</td></tr>
+  <tr><td>Sahip olmadığı dosyayı silmeye çalışma</td><td>FILE_DELETE_ERR gönder; bağlantı devam eder</td><td>Kullanıcıya hata mesajı göster</td></tr>
+  <tr><td>Boş panoya yapıştırma isteği</td><td>ERROR("Pano boş") gönder</td><td>Kullanıcıya bilgi mesajı göster</td></tr>
+  <tr><td>Disk yazım hatası</td><td>ERROR gönder; ACTIVE durumuna geri dön</td><td>Kullanıcıya kayıt başarısız mesajı göster</td></tr>
+  <tr><td>90 saniye boyunca PING gelmemesi</td><td>Bağlantıyı kapat; USER_LEAVE yayınla</td><td>Bağlantı kesildi olarak değerlendir</td></tr>
+  <tr><td>TCP bağlantısı beklenmedik şekilde kapanması</td><td>USER_LEAVE yayınla; oturumu sil</td><td>Bağlantı kesildi uyarısı göster</td></tr>
+</table>
+
+<h3>8.3 Canlılık Mekanizması (Keepalive)</h3>
+<p>
+İstemci her <strong>30 saniyede bir</strong> PING gönderir. Sunucu PONG ile yanıt verir ve son PING zamanını günceller. Sunucu, herhangi bir oturumdan <strong>90 saniye</strong> boyunca PING gelmediğini tespit ederse o oturumu zaman aşımına uğramış kabul ederek bağlantıyı kapatır.
+</p>
+
+<hr style="margin-top: 40px; border-color: #c0cfe0;">
+<p style="text-align:center; color:#888; font-size:9pt; margin-top: 16px;">
+  MultiUserPaint Uygulama Protokolü v1.0 — Bu doküman dil bağımsızdır ve kod örneği içermez.
+</p>
+
+</body>
+</html>
