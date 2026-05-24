@@ -39,6 +39,13 @@ public class CanvasPanel extends JPanel {
     private int startX, startY, lastX, lastY;
     private boolean dragging = false;
 
+    // Last known mouse position (for paste-at-cursor)
+    private int lastMouseX = 0, lastMouseY = 0;
+
+    // Undo stack
+    private final java.util.Deque<BufferedImage> undoStack = new java.util.ArrayDeque<>();
+    private static final int MAX_UNDO = 20;
+
     // Selection for clipboard
     private Rectangle selectionRect = null;
     private boolean selectMode = false;
@@ -65,7 +72,8 @@ public class CanvasPanel extends JPanel {
             @Override public void mouseReleased(MouseEvent e) { onReleased(e); }
         });
         addMouseMotionListener(new MouseMotionAdapter() {
-            @Override public void mouseDragged(MouseEvent e) { onDragged(e); }
+            @Override public void mouseDragged(MouseEvent e) { lastMouseX = e.getX(); lastMouseY = e.getY(); onDragged(e); }
+            @Override public void mouseMoved(MouseEvent e)   { lastMouseX = e.getX(); lastMouseY = e.getY(); }
         });
     }
 
@@ -93,6 +101,7 @@ public class CanvasPanel extends JPanel {
     // -------------------------------------------------------------------------
 
     private void onPressed(MouseEvent e) {
+        pushUndo(); // snapshot before any draw operation
         startX = lastX = e.getX();
         startY = lastY = e.getY();
         dragging = true;
@@ -259,6 +268,7 @@ public class CanvasPanel extends JPanel {
 
     public void fromPixelBytes(byte[] data, int width, int height) {
         backBuffer = FileStore.pixelBytesToImage(data, width, height);
+        undoStack.clear();
         repaint();
     }
 
@@ -268,9 +278,27 @@ public class CanvasPanel extends JPanel {
 
     public void setCurrentTool(byte tool)      { this.currentTool = tool; selectMode = false; }
     public void setSelectMode(boolean on)       { this.selectMode = on; }
+    public boolean isSelectMode()               { return selectMode; }
+    public void cancelSelection()               { selectMode = false; selectionRect = null; repaint(); }
     public void setCurrentColor(Color color)    { this.currentColor = color; }
     public void setStrokeWidth(int width)       { this.strokeWidth = width; }
     public Color getCurrentColor()              { return currentColor; }
+    public int getLastMouseX()                  { return lastMouseX; }
+    public int getLastMouseY()                  { return lastMouseY; }
+    public int getCanvasWidth()                 { return canvasWidth; }
+    public int getCanvasHeight()                { return canvasHeight; }
+
+    public void undo() {
+        if (undoStack.isEmpty()) return;
+        backBuffer = undoStack.pop();
+        repaint();
+    }
+
+    public void selectAll() {
+        selectMode = true;
+        selectionRect = new Rectangle(0, 0, canvasWidth, canvasHeight);
+        repaint();
+    }
 
     // -------------------------------------------------------------------------
     // Callback
@@ -281,6 +309,15 @@ public class CanvasPanel extends JPanel {
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    private void pushUndo() {
+        BufferedImage copy = new BufferedImage(canvasWidth, canvasHeight, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = copy.createGraphics();
+        g.drawImage(backBuffer, 0, 0, null);
+        g.dispose();
+        undoStack.push(copy);
+        if (undoStack.size() > MAX_UNDO) undoStack.pollLast();
+    }
 
     private void clearOverlay() {
         Graphics2D g = overlayBuffer.createGraphics();

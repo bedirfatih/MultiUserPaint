@@ -35,6 +35,12 @@ public enum MessageType {
     USER_LIST_REQ      (0x42),
     USER_LIST_RESP     (0x43),
 
+    // Canvas snapshot (for sync when new user joins active session)
+    CANVAS_SNAPSHOT_REQ  (0x60),
+    CANVAS_SNAPSHOT_DATA (0x61),
+    // Server broadcasts full canvas state to other viewers (e.g. after undo)
+    CANVAS_UPDATE        (0x62),
+
     // Server notifications
     AUTOSAVE_NOTIFY    (0x50),
 

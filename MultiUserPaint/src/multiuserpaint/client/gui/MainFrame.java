@@ -4,7 +4,10 @@ import multiuserpaint.client.network.ConnectionManager;
 import multiuserpaint.common.*;
 
 import javax.swing.*;
+import javax.swing.text.JTextComponent;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.HashMap;
@@ -41,6 +44,7 @@ public class MainFrame extends JFrame {
 
         buildMenuBar();
         buildUI();
+        setupKeyboardShortcuts();
 
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize(1100, 700);
@@ -74,7 +78,12 @@ public class MainFrame extends JFrame {
         JMenuItem selectItem = new JMenuItem("Select Mode");
         copyItem.addActionListener(e -> copySelection(false));
         cutItem.addActionListener(e -> copySelection(true));
-        pasteItem.addActionListener(e -> connection.sendClipboardPasteReq());
+        pasteItem.addActionListener(e -> {
+            CanvasPanel c = getActiveCanvas();
+            Integer fid = getActiveFileId();
+            if (c != null && fid != null && connection.isConnected())
+                connection.sendClipboardPasteReq(fid, c.getLastMouseX(), c.getLastMouseY());
+        });
         selectItem.addActionListener(e -> {
             CanvasPanel c = getActiveCanvas();
             if (c != null) c.setSelectMode(true);
@@ -114,6 +123,59 @@ public class MainFrame extends JFrame {
         add(toolbar, BorderLayout.NORTH);
         add(center, BorderLayout.CENTER);
         add(statusBar, BorderLayout.SOUTH);
+    }
+
+    // -------------------------------------------------------------------------
+    // Keyboard shortcuts
+    // -------------------------------------------------------------------------
+
+    private void setupKeyboardShortcuts() {
+        InputMap im = getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        ActionMap am = getRootPane().getActionMap();
+
+        bindKey(im, am, KeyEvent.VK_S, "kb-select", e -> {
+            CanvasPanel c = getActiveCanvas();
+            if (c == null) return;
+            if (c.isSelectMode()) { c.cancelSelection(); setStatus("Ready"); }
+            else                  { c.setSelectMode(true); setStatus("Select mode [S] — drag to select, Esc to cancel"); }
+        });
+        bindKey(im, am, KeyEvent.VK_ESCAPE, "kb-escape", e -> {
+            CanvasPanel c = getActiveCanvas();
+            if (c != null) { c.cancelSelection(); setStatus("Ready"); }
+        });
+        bindKey(im, am, KeyEvent.VK_Z, "kb-undo", e -> {
+            CanvasPanel c = getActiveCanvas();
+            Integer fileId = getActiveFileId();
+            if (c == null) return;
+            c.undo();
+            setStatus("Undo [Z]");
+            if (fileId != null && connection.isConnected())
+                connection.sendCanvasSnapshotData(fileId, c.getCanvasWidth(), c.getCanvasHeight(), c.toPixelBytes());
+        });
+        bindKey(im, am, KeyEvent.VK_C, "kb-copy",    e -> copySelection(false));
+        bindKey(im, am, KeyEvent.VK_V, "kb-paste",   e -> {
+            CanvasPanel c = getActiveCanvas();
+            Integer fileId = getActiveFileId();
+            if (c != null && fileId != null && connection.isConnected())
+                connection.sendClipboardPasteReq(fileId, c.getLastMouseX(), c.getLastMouseY());
+        });
+        bindKey(im, am, KeyEvent.VK_X, "kb-cut",     e -> copySelection(true));
+        bindKey(im, am, KeyEvent.VK_A, "kb-selectall", e -> {
+            CanvasPanel c = getActiveCanvas();
+            if (c != null) { c.selectAll(); setStatus("Selected all [A]"); }
+        });
+    }
+
+    private void bindKey(InputMap im, ActionMap am, int keyCode, String name,
+                         java.util.function.Consumer<ActionEvent> handler) {
+        im.put(KeyStroke.getKeyStroke(keyCode, 0), name);
+        am.put(name, new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) {
+                Component focused = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+                if (focused instanceof JTextComponent) return;
+                handler.accept(e);
+            }
+        });
     }
 
     // -------------------------------------------------------------------------
@@ -318,13 +380,31 @@ public class MainFrame extends JFrame {
                 case CLIPBOARD_DATA: {
                     MessageDecoder.ClipboardDataPayload p =
                         MessageDecoder.decodeClipboardData(msg.getPayload());
-                    CanvasPanel canvas = getActiveCanvas();
+                    CanvasPanel canvas = openCanvases.get(p.fileId);
                     if (canvas != null) {
                         BufferedImage img = multiuserpaint.server.store.FileStore
                             .pixelBytesToImage(p.pixelData, p.width, p.height);
-                        // Paste at center for simplicity
-                        canvas.pasteImage(img, 50, 50);
-                        setStatus("Pasted clipboard (" + p.width + "x" + p.height + ")");
+                        canvas.pasteImage(img, p.x, p.y);
+                        setStatus("Pasted (" + p.width + "x" + p.height + ") at " + p.x + "," + p.y);
+                    }
+                    break;
+                }
+                case CANVAS_SNAPSHOT_REQ: {
+                    int fileId = MessageDecoder.decodeCanvasSnapshotReq(msg.getPayload());
+                    CanvasPanel canvas = openCanvases.get(fileId);
+                    if (canvas != null && connection.isConnected()) {
+                        connection.sendCanvasSnapshotData(fileId,
+                            canvas.getCanvasWidth(), canvas.getCanvasHeight(), canvas.toPixelBytes());
+                    }
+                    break;
+                }
+                case CANVAS_UPDATE: {
+                    MessageDecoder.CanvasUpdatePayload p =
+                        MessageDecoder.decodeCanvasUpdate(msg.getPayload());
+                    CanvasPanel canvas = openCanvases.get(p.fileId);
+                    if (canvas != null) {
+                        canvas.fromPixelBytes(p.pixelData, p.width, p.height);
+                        setStatus("Canvas updated by remote user");
                     }
                     break;
                 }

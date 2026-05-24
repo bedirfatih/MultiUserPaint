@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MultiUserPaint — Kod Anlatımı</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11pt; color: #1a1a1a;
+         background: #f4f6fb; padding: 0; line-height: 1.7; }
+  .sidebar {
+    position: fixed; left: 0; top: 0; width: 260px; height: 100vh;
+    background: #1a3c6e; color: #cde; overflow-y: auto; padding: 20px 0;
+  }
+  .sidebar h2 { color: #fff; font-size: 10pt; text-transform: uppercase;
+                letter-spacing: 1px; padding: 8px 18px; margin-top: 14px;
+                border-top: 1px solid #2a5298; }
+  .sidebar a { display: block; color: #b0d0f0; text-decoration: none;
+               padding: 5px 18px; font-size: 9.5pt; }
+  .sidebar a:hover { background: #2a5298; color: #fff; }
+  .sidebar .logo { color: #fff; font-size: 14pt; font-weight: bold;
+                   padding: 14px 18px 8px; border-bottom: 1px solid #2a5298; }
+  .sidebar .logo span { font-size: 9pt; color: #89aacc; display: block; }
+  main { margin-left: 260px; padding: 40px 50px; max-width: 1100px; }
+  h1 { font-size: 20pt; color: #1a3c6e; border-bottom: 3px solid #1a3c6e;
+       padding-bottom: 8px; margin-bottom: 24px; }
+  h2 { font-size: 15pt; color: #1a3c6e; margin-top: 50px; margin-bottom: 4px;
+       border-left: 5px solid #1a3c6e; padding-left: 12px; }
+  h3 { font-size: 12pt; color: #2a5298; margin-top: 28px; margin-bottom: 8px; }
+  p { margin-bottom: 10px; }
+  ul { margin: 8px 0 12px 24px; }
+  li { margin-bottom: 4px; }
+  .package-label {
+    display: inline-block; background: #e8f0fe; color: #1a3c6e; border-radius: 4px;
+    padding: 2px 10px; font-size: 9pt; font-weight: bold; margin-bottom: 6px;
+    border: 1px solid #b0c8e8;
+  }
+  .class-card {
+    background: #fff; border-radius: 8px; border: 1px solid #d0dce8;
+    padding: 28px 32px; margin-bottom: 40px;
+    box-shadow: 0 2px 8px rgba(26,60,110,0.06);
+  }
+  .class-header {
+    display: flex; align-items: flex-start; gap: 16px; margin-bottom: 16px;
+  }
+  .class-icon {
+    background: #1a3c6e; color: #fff; border-radius: 6px; width: 44px; height: 44px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18pt; font-weight: bold; flex-shrink: 0;
+  }
+  .class-title h2 { margin: 0; padding: 0; border: none; font-size: 16pt; }
+  .class-title .subtitle { color: #666; font-size: 10pt; margin-top: 2px; }
+  code {
+    font-family: 'Cascadia Code', 'Courier New', monospace;
+    font-size: 9.5pt; background: #eef3fc; border-radius: 3px; padding: 1px 5px;
+    color: #1a3c6e;
+  }
+  pre {
+    font-family: 'Cascadia Code', 'Courier New', monospace;
+    font-size: 9.5pt; background: #1e2a3a; color: #cde; border-radius: 6px;
+    padding: 18px 20px; margin: 14px 0; overflow-x: auto; line-height: 1.6;
+    border-left: 4px solid #4a9eff;
+  }
+  pre .kw  { color: #569cd6; }
+  pre .cm  { color: #6a9955; }
+  pre .st  { color: #ce9178; }
+  pre .nm  { color: #dcdcaa; }
+  pre .tp  { color: #4ec9b0; }
+  pre .cn  { color: #b5cea8; }
+  .note {
+    background: #fff8dc; border-left: 4px solid #f0a500; padding: 10px 14px;
+    border-radius: 2px; font-size: 10pt; margin: 14px 0;
+  }
+  .info {
+    background: #e8f4fd; border-left: 4px solid #2196f3; padding: 10px 14px;
+    border-radius: 2px; font-size: 10pt; margin: 14px 0;
+  }
+  .ok {
+    background: #e8f5e9; border-left: 4px solid #4caf50; padding: 10px 14px;
+    border-radius: 2px; font-size: 10pt; margin: 14px 0;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 10pt; }
+  th { background: #1a3c6e; color: #fff; padding: 7px 10px; text-align: left; }
+  td { padding: 6px 10px; border: 1px solid #c8d8e8; vertical-align: top; }
+  tr:nth-child(even) td { background: #f0f5fb; }
+  .tag { display: inline-block; border-radius: 3px; padding: 1px 7px;
+         font-size: 9pt; font-weight: bold; }
+  .tag.common { background: #673ab7; color: #fff; }
+  .tag.server { background: #1976d2; color: #fff; }
+  .tag.client { background: #388e3c; color: #fff; }
+  .tag.store  { background: #f57c00; color: #fff; }
+  .tag.handler{ background: #c62828; color: #fff; }
+  .divider { height: 2px; background: linear-gradient(90deg,#1a3c6e,#e8f0fe);
+             margin: 40px 0; border-radius: 2px; }
+  @media print { .sidebar { display: none; } main { margin-left: 0; } }
+</style>
+</head>
+<body>
+
+<!-- ====== SIDEBAR ====== -->
+<nav class="sidebar">
+  <div class="logo">MultiUserPaint<span>Kod Anlatımı</span></div>
+
+  <h2>Common Paketi</h2>
+  <a href="#ProtocolConstants">ProtocolConstants</a>
+  <a href="#FSMState">FSMState</a>
+  <a href="#MessageType">MessageType</a>
+  <a href="#Message">Message</a>
+  <a href="#MessageEncoder">MessageEncoder</a>
+  <a href="#MessageDecoder">MessageDecoder</a>
+
+  <h2>Server Paketi</h2>
+  <a href="#PaintServer">PaintServer</a>
+  <a href="#NIOSelector">NIOSelector</a>
+  <a href="#MessageFramer">MessageFramer</a>
+  <a href="#MessageDispatcher">MessageDispatcher</a>
+  <a href="#ClientSession">ClientSession</a>
+
+  <h2>Server — Store</h2>
+  <a href="#SessionRegistry">SessionRegistry</a>
+  <a href="#FileMetadata">FileMetadata</a>
+  <a href="#FileStore">FileStore</a>
+  <a href="#AutoSaveScheduler">AutoSaveScheduler</a>
+
+  <h2>Server — Handlers</h2>
+  <a href="#LoginHandler">LoginHandler</a>
+  <a href="#DrawHandler">DrawHandler</a>
+  <a href="#FileHandler">FileHandler</a>
+  <a href="#ClipboardHandler">ClipboardHandler</a>
+
+  <h2>Client Paketi</h2>
+  <a href="#PaintClient">PaintClient</a>
+  <a href="#ConnectionManager">ConnectionManager</a>
+  <a href="#NetworkReader">NetworkReader</a>
+  <a href="#NetworkWriter">NetworkWriter</a>
+  <a href="#CanvasPanel">CanvasPanel</a>
+  <a href="#MainFrame">MainFrame</a>
+</nav>
+
+<!-- ====== MAIN ====== -->
+<main>
+<h1>MultiUserPaint — Tüm Sınıfların Kod Anlatımı</h1>
+<p>Bu doküman projedeki her sınıfı; görevini, tasarım kararlarını ve kritik kod bloklarını açıklayarak anlatmaktadır. Sunum sırasında referans olarak kullanılabilir.</p>
+
+<!-- ============================================================ COMMON -->
+<div class="divider"></div>
+<h1>BÖLÜM 1 — Common Paketi</h1>
+<p>Common paketi hem sunucu hem istemci tarafından ortaklaşa kullanılan sınıfları barındırır. Protokol tanımları, mesaj tipleri ve kodlama/çözme işlemleri burada yer alır.</p>
+
+<!-- ProtocolConstants -->
+<div class="class-card" id="ProtocolConstants">
+  <div class="class-header">
+    <div class="class-icon">C</div>
+    <div class="class-title">
+      <h2>ProtocolConstants</h2>
+      <div class="subtitle"><span class="tag common">common</span> &nbsp; Protokol sabit değerleri — tüm sayısal parametreler tek yerde</div>
+    </div>
+  </div>
+
+  <h3>Görev ve Tasarım Amacı</h3>
+  <p>Protokolde kullanılan tüm sihirli sayılar, eşik değerleri ve boyutlar bu sınıfta <code>public static final</code> sabit olarak tanımlanmıştır. Herhangi bir değişiklik gerektiğinde tek bir dosyada güncelleme yeterlidir; sınıf kendi başına örneklenemez (<code>private</code> yapıcı).</p>
+
+  <h3>Kritik Sabitler</h3>
+<pre>
+<span class="kw">public class</span> <span class="tp">ProtocolConstants</span> {
+    <span class="cm">// Her mesajın başına eklenen 2 baytlık sihirli sayı.</span>
+    <span class="cm">// Yanlış magic gelirse bağlantı anında kesilir.</span>
+    <span class="kw">public static final short</span> MAGIC = (<span class="kw">short</span>) <span class="cn">0xCAFE</span>;
+
+    <span class="cm">// Protokol versiyonu. İleride farklı versiyonlarla uyumluluk için.</span>
+    <span class="kw">public static final byte</span>  VERSION = <span class="cn">0x01</span>;
+
+    <span class="cm">// MAGIC(2) + VERSION(1) + TYPE(1) + PAYLOAD_LEN(4) = 8 bayt</span>
+    <span class="kw">public static final int</span>   HEADER_SIZE = <span class="cn">8</span>;
+
+    <span class="cm">// Sunucu büyük piksel verisi için 10 MB'a izin veriyor.</span>
+    <span class="kw">public static final int</span>   MAX_PAYLOAD_SIZE = <span class="cn">10_485_760</span>;
+
+    <span class="cm">// NIO okuma buffer'ı — küçük mesajlar için yeterli.</span>
+    <span class="kw">public static final int</span>   READ_BUFFER_SIZE = <span class="cn">65_536</span>;
+
+    <span class="kw">public static final int</span>   DEFAULT_PORT               = <span class="cn">9090</span>;
+    <span class="kw">public static final int</span>   AUTO_SAVE_INTERVAL_SECONDS = <span class="cn">60</span>;
+    <span class="kw">public static final int</span>   PING_INTERVAL_SECONDS      = <span class="cn">30</span>;
+    <span class="kw">public static final int</span>   KEEPALIVE_TIMEOUT_SECONDS  = <span class="cn">90</span>;
+    <span class="kw">public static final int</span>   DEFAULT_CANVAS_WIDTH       = <span class="cn">800</span>;
+    <span class="kw">public static final int</span>   DEFAULT_CANVAS_HEIGHT      = <span class="cn">600</span>;
+
+    <span class="kw">private</span> <span class="nm">ProtocolConstants</span>() {} <span class="cm">// örneklenemez</span>
+}
+</pre>
+
+  <div class="info"><strong>Neden önemli?</strong> İstemci her 30 saniyede PING gönderir (<code>PING_INTERVAL_SECONDS</code>). Sunucu 90 saniye PING gelmezse bağlantıyı keser (<code>KEEPALIVE_TIMEOUT_SECONDS</code>). Otomatik kayıt 60 saniyede bir tetiklenir (<code>AUTO_SAVE_INTERVAL_SECONDS</code>). Bu üç değer birbirini doğrudan etkiler.</div>
+</div>
+
+<!-- FSMState -->
+<div class="class-card" id="FSMState">
+  <div class="class-header">
+    <div class="class-icon">F</div>
+    <div class="class-title">
+      <h2>FSMState</h2>
+      <div class="subtitle"><span class="tag common">common</span> &nbsp; Sonlu Durum Makinası durumları — hem sunucu hem istemci kullanır</div>
+    </div>
+  </div>
+
+  <h3>Görev</h3>
+  <p>Protokolün temelinde bir Sonlu Durum Makinası (FSM) yatar. Her bağlantı belirli bir durumda bulunur ve yalnızca o duruma uygun mesajları kabul eder. Tüm durum isimleri bu enum'da toplandığı için istemci ve sunucu aynı durum adlarını kullanır.</p>
+
+<pre>
+<span class="kw">public enum</span> <span class="tp">FSMState</span> {
+    <span class="cm">// ---- Sunucu taraflı durumlar (ClientSession'da kullanılır) ----</span>
+    HANDSHAKE,   <span class="cm">// TCP kuruldu, LOGIN_REQ bekleniyor</span>
+    ACTIVE,      <span class="cm">// Giriş yapıldı, tüm işlemler serbest</span>
+    SAVING,      <span class="cm">// Diske yazım sürüyor, yeni mesajlar beklemeye alınır</span>
+    CLOSING,     <span class="cm">// Bağlantı düzgün kapatılıyor</span>
+    ERROR,       <span class="cm">// Kurtarılamaz hata, oturum silinecek</span>
+
+    <span class="cm">// ---- İstemci taraflı durumlar (ConnectionManager'da kullanılır) ----</span>
+    DISCONNECTED,
+    CONNECTING,
+    LOGGING_IN,
+    CONNECTED,
+    RECONNECTING
+}
+</pre>
+
+  <h3>Durum Geçiş Mantığı</h3>
+  <table>
+    <tr><th>Sunucu Durumu</th><th>Ne zaman girilir?</th><th>Kabul edilen mesajlar</th></tr>
+    <tr><td><strong>HANDSHAKE</strong></td><td>TCP bağlantısı kurulunca</td><td>Yalnızca LOGIN_REQ</td></tr>
+    <tr><td><strong>ACTIVE</strong></td><td>Başarılı login sonrası</td><td>Tüm mesajlar</td></tr>
+    <tr><td><strong>SAVING</strong></td><td>FILE_SAVE_REQ gelince</td><td>Yalnızca PING</td></tr>
+    <tr><td><strong>CLOSING</strong></td><td>TCP kapanınca</td><td>Hiçbiri</td></tr>
+    <tr><td><strong>ERROR</strong></td><td>Geçersiz MAGIC / protokol hatası</td><td>Hiçbiri</td></tr>
+  </table>
+
+  <div class="note"><strong>Tasarım notu:</strong> HANDSHAKE'deyken LOGIN_REQ dışında herhangi bir mesaj gelirse sunucu ERROR mesajı gönderip bağlantıyı keser. Bu sayede kimliği doğrulanmamış istemciler sisteme hiçbir işlem yaptıramaz.</div>
+</div>
+
+<!-- MessageType -->
+<div class="class-card" id="MessageType">
+  <div class="class-header">
+    <div class="class-icon">T</div>
+    <div class="class-title">
+      <h2>MessageType</h2>
+      <div class="subtitle"><span class="tag common">common</span> &nbsp; Tüm mesaj tipi kodları — 1 baytlık sayısal kod ↔ anlamlı isim</div>
+    </div>
+  </div>
+
+  <h3>Görev</h3>
+  <p>Wire format'ta her mesaj tipini 1 baytlık hexadecimal kod ile temsil eder. Bu enum sayesinde kod içinde <code>0x20</code> gibi sihirli sayılar yerine <code>MessageType.DRAW_EVENT</code> gibi okunabilir isimler kullanılır.</p>
+
+<pre>
+<span class="kw">public enum</span> <span class="tp">MessageType</span> {
+    LOGIN_REQ          (<span class="cn">0x01</span>),
+    LOGIN_OK           (<span class="cn">0x02</span>),
+    LOGIN_ERR          (<span class="cn">0x03</span>),
+
+    FILE_CREATE_REQ    (<span class="cn">0x10</span>),  FILE_CREATE_OK  (<span class="cn">0x11</span>),
+    FILE_OPEN_REQ      (<span class="cn">0x12</span>),  FILE_OPEN_DATA  (<span class="cn">0x13</span>),
+    FILE_LIST_REQ      (<span class="cn">0x14</span>),  FILE_LIST_RESP  (<span class="cn">0x15</span>),
+    FILE_SAVE_REQ      (<span class="cn">0x16</span>),  FILE_SAVE_OK    (<span class="cn">0x17</span>),
+    FILE_DELETE_REQ    (<span class="cn">0x18</span>),  FILE_DELETE_OK  (<span class="cn">0x19</span>),
+    FILE_DELETE_ERR    (<span class="cn">0x1A</span>),
+
+    DRAW_EVENT         (<span class="cn">0x20</span>),  DRAW_BROADCAST  (<span class="cn">0x21</span>),
+
+    CLIPBOARD_COPY     (<span class="cn">0x30</span>),  CLIPBOARD_PASTE_REQ (<span class="cn">0x31</span>),
+    CLIPBOARD_DATA     (<span class="cn">0x32</span>),  CLIPBOARD_CUT   (<span class="cn">0x33</span>),
+
+    CANVAS_SNAPSHOT_REQ  (<span class="cn">0x60</span>),
+    CANVAS_SNAPSHOT_DATA (<span class="cn">0x61</span>),
+    CANVAS_UPDATE        (<span class="cn">0x62</span>),
+
+    AUTOSAVE_NOTIFY    (<span class="cn">0x50</span>),
+    PING (<span class="cn">0xF0</span>),  PONG (<span class="cn">0xF1</span>),
+    ERROR (<span class="cn">0xFF</span>);
+
+    <span class="kw">private final int</span> code;
+    <span class="tp">MessageType</span>(<span class="kw">int</span> code) { <span class="kw">this</span>.code = code; }
+
+    <span class="cm">// Gelen bayt → enum dönüşümü. Bilinmeyen kod → IllegalArgumentException.</span>
+    <span class="kw">public static</span> <span class="tp">MessageType</span> <span class="nm">fromCode</span>(<span class="kw">byte</span> code) {
+        <span class="kw">int</span> unsigned = code &amp; <span class="cn">0xFF</span>; <span class="cm">// işaretsiz yap (0xF0 vs. -16 sorunu)</span>
+        <span class="kw">for</span> (<span class="tp">MessageType</span> t : values())
+            <span class="kw">if</span> (t.code == unsigned) <span class="kw">return</span> t;
+        <span class="kw">throw new</span> <span class="tp">IllegalArgumentException</span>(<span class="st">"Unknown: 0x"</span> + <span class="tp">Integer</span>.toHexString(unsigned));
+    }
+}
+</pre>
+
+  <div class="info"><strong>Kodlama şeması:</strong> 0x0x Login, 0x1x Dosya işlemleri, 0x2x Çizim, 0x3x Pano, 0x4x Kullanıcı olayları, 0x5x Bildirimler, 0x6x Canvas senkronizasyon, 0xFx Keepalive/Hata. Bu gruplandırma switch-case bloklarında mantıksal ayrım sağlar.</div>
+
+  <div class="note"><strong>Java'da byte işaret sorunu:</strong> Java'da <code>byte</code> işaretli (-128..127). 0xF0 byte olarak -16'dır. Bu yüzden <code>fromCode</code> içinde <code>code & 0xFF</code> ile işaretsiz int'e çevrilir, karşılaştırma bu değerle yapılır.</div>
+</div>
+
+<!-- Message -->
+<div class="class-card" id="Message">
+  <div class="class-header">
+    <div class="class-icon">M</div>
+    <div class="class-title">
+      <h2>Message</h2>
+      <div class="subtitle"><span class="tag common">common</span> &nbsp; Çözümlenmiş mesajı taşıyan veri nesnesi (immutable)</div>
+    </div>
+  </div>
+
+  <h3>Görev</h3>
+  <p>Wire format'tan ayrıştırılan bir mesajı temsil eder. Tip ve ham payload baytlarını taşır. <code>MessageFramer</code> (sunucu) ve <code>NetworkReader</code> (istemci) mesajları tamamlandıktan sonra bu nesneye dönüştürür; dispatcher sınıfları bu nesneyi alarak ilgili handler'a yönlendirir.</p>
+
+<pre>
+<span class="kw">public class</span> <span class="tp">Message</span> {
+    <span class="kw">private final</span> <span class="tp">MessageType</span> type;
+    <span class="kw">private final byte</span>[]      payload;
+
+    <span class="cm">// Factory method — yapıcı private, kontrollü oluşturma</span>
+    <span class="kw">public static</span> <span class="tp">Message</span> <span class="nm">of</span>(<span class="tp">MessageType</span> type, <span class="kw">byte</span>[] payload) {
+        <span class="kw">return new</span> <span class="tp">Message</span>(type, payload != <span class="kw">null</span> ? payload : <span class="kw">new byte</span>[<span class="cn">0</span>]);
+    }
+}
+</pre>
+
+  <div class="info"><strong>Tasarım:</strong> Message nesnesi immutable'dır — oluşturulunca değişmez. Payload ham bayttır; anlamlandırma işi <code>MessageDecoder</code>'a aittir. Bu ayrım MessageDecoder'ı bağımsız test edilebilir kılar.</div>
+</div>
+
+<!-- MessageEncoder -->
+<div class="class-card" id="MessageEncoder">
+  <div class="class-header">
+    <div class="class-icon">E</div>
+    <div class="class-title">
+      <h2>MessageEncoder</h2>
+      <div class="subtitle"><span class="tag common">common</span> &nbsp; Parametreleri wire-format bayt dizisine çevirir</div>
+    </div>
+  </div>
+
+  <h3>Görev</h3>
+  <p>Uygulama katmanındaki verileri (kullanıcı adı, koordinatlar, piksel verisi vb.) ağ üzerinden gönderilebilecek binary formata dönüştürür. Her mesaj tipi için ayrı bir <code>encode*()</code> metodu bulunur. Tüm metodlar <code>static</code>'tir, sınıf örneklenemez.</p>
+
+  <h3>Wire Format — encode() metodu</h3>
+<pre>
+<span class="kw">public static byte</span>[] <span class="nm">encode</span>(<span class="tp">MessageType</span> type, <span class="kw">byte</span>[] payload) {
+    <span class="kw">int</span> payloadLen = payload != <span class="kw">null</span> ? payload.length : <span class="cn">0</span>;
+    <span class="kw">byte</span>[] frame = <span class="kw">new byte</span>[HEADER_SIZE + payloadLen]; <span class="cm">// 8 + N bayt</span>
+
+    <span class="cm">// Byte 0-1: MAGIC = 0xCAFE (big-endian)</span>
+    frame[<span class="cn">0</span>] = (<span class="kw">byte</span>) ((MAGIC &gt;&gt; <span class="cn">8</span>) &amp; <span class="cn">0xFF</span>);   <span class="cm">// 0xCA</span>
+    frame[<span class="cn">1</span>] = (<span class="kw">byte</span>)  (MAGIC        &amp; <span class="cn">0xFF</span>);   <span class="cm">// 0xFE</span>
+
+    <span class="cm">// Byte 2: VERSION = 0x01</span>
+    frame[<span class="cn">2</span>] = VERSION;
+
+    <span class="cm">// Byte 3: Mesaj tipi kodu</span>
+    frame[<span class="cn">3</span>] = type.getCode();
+
+    <span class="cm">// Byte 4-7: Payload uzunluğu (4 bayt, big-endian)</span>
+    frame[<span class="cn">4</span>] = (<span class="kw">byte</span>) ((payloadLen &gt;&gt; <span class="cn">24</span>) &amp; <span class="cn">0xFF</span>);
+    frame[<span class="cn">5</span>] = (<span class="kw">byte</span>) ((payloadLen &gt;&gt; <span class="cn">16</span>) &amp; <span class="cn">0xFF</span>);
+    frame[<span class="cn">6</span>] = (<span class="kw">byte</span>) ((payloadLen &gt;&gt;  <span class="cn">8</span>) &amp; <span class="cn">0xFF</span>);
+    frame[<span class="cn">7</span>] = (<span class="kw">byte</span>)  (payloadLen        &amp; <span class="cn">0xFF</span>);
+
+    <span class="cm">// Byte 8+: Payload</span>
+    <span class="kw">if</span> (payload != <span class="kw">null</span>) System.arraycopy(payload, <span class="cn">0</span>, frame, HEADER_SIZE, payloadLen);
+    <span class="kw">return</span> frame;
+}
+</pre>
+
+  <h3>buildWith() — Lambda ile Temiz Payload Oluşturma</h3>
+<pre>
+<span class="cm">// Fonksiyonel arayüz: DataOutputStream'e yazan lambda</span>
+@<span class="tp">FunctionalInterface</span>
+<span class="kw">private interface</span> <span class="tp">PayloadWriter</span> {
+    <span class="kw">void</span> <span class="nm">write</span>(<span class="tp">DataOutputStream</span> out) <span class="kw">throws</span> <span class="tp">IOException</span>;
+}
+
+<span class="kw">private static byte</span>[] <span class="nm">buildWith</span>(<span class="tp">PayloadWriter</span> writer, <span class="tp">MessageType</span> type) {
+    <span class="tp">ByteArrayOutputStream</span> bos = <span class="kw">new</span> <span class="tp">ByteArrayOutputStream</span>();
+    <span class="tp">DataOutputStream</span>      dos = <span class="kw">new</span> <span class="tp">DataOutputStream</span>(bos);
+    writer.write(dos);   <span class="cm">// lambda çağrısı: payload'ı dos'a yaz</span>
+    dos.flush();
+    <span class="kw">return</span> <span class="nm">encode</span>(type, bos.toByteArray());
+}
+
+<span class="cm">// Örnek kullanım — DRAW_EVENT kodlaması:</span>
+<span class="kw">public static byte</span>[] <span class="nm">encodeDrawEvent</span>(<span class="kw">int</span> fileId, <span class="kw">byte</span> toolType, <span class="kw">int</span> colorArgb,
+                                      <span class="kw">short</span> strokeWidth, <span class="kw">int</span> x1, <span class="kw">int</span> y1, <span class="kw">int</span> x2, <span class="kw">int</span> y2) {
+    <span class="kw">return</span> <span class="nm">buildWith</span>(out -&gt; {
+        out.writeInt(fileId);
+        out.writeByte(toolType);
+        out.writeInt(colorArgb);
+        out.writeShort(strokeWidth);
+        out.writeInt(x1); out.writeInt(y1);
+        out.writeInt(x2); out.writeInt(y2);
+    }, <span class="tp">MessageType</span>.DRAW_EVENT);
+}
+</pre>
+
+  <div class="info"><strong>Neden DataOutputStream?</strong> <code>writeInt()</code>, <code>writeShort()</code>, <code>writeLong()</code> metodları big-endian formatında yazar — Java'nın varsayılan byte sırasıdır. Bu sayede platform bağımsızlığı sağlanır.</div>
+</div>
+
+<!-- MessageDecoder -->
+<div class="class-card" id="MessageDecoder">
+  <div class="class-header">
+    <div class="class-icon">D</div>
+    <div class="class-title">
+      <h2>MessageDecoder</h2>
+      <div class="subtitle"><span class="tag common">common</span> &nbsp; Ham payload baytlarını anlamlı Java nesnelerine dönüştürür</div>
+    </div>
+  </div>
+
+  <h3>Görev</h3>
+  <p>MessageEncoder'ın tam tersi işlevi görür. Her mesaj tipi için bir <code>decode*()</code> metodu vardır ve ilgili payload POJO sınıfını döndürür. Handler sınıfları ham bayt yerine bu POJO'larla çalışır.</p>
+
+  <h3>Payload POJO'ları ve Çözümleme</h3>
+<pre>
+<span class="cm">// Payload için basit veri sınıfı — tüm alanlar public final</span>
+<span class="kw">public static class</span> <span class="tp">DrawEventPayload</span> {
+    <span class="kw">public final int</span>   fileId;
+    <span class="kw">public final byte</span>  toolType;
+    <span class="kw">public final int</span>   colorArgb;
+    <span class="kw">public final short</span> strokeWidth;
+    <span class="kw">public final int</span>   x1, y1, x2, y2;
+}
+
+<span class="kw">public static</span> <span class="tp">DrawEventPayload</span> <span class="nm">decodeDrawEvent</span>(<span class="kw">byte</span>[] p) <span class="kw">throws</span> <span class="tp">IOException</span> {
+    <span class="tp">DataInputStream</span> in = <span class="nm">wrap</span>(p); <span class="cm">// byte[] → DataInputStream</span>
+    <span class="kw">return new</span> <span class="tp">DrawEventPayload</span>(
+        in.readInt(),    <span class="cm">// fileId</span>
+        in.readByte(),   <span class="cm">// toolType</span>
+        in.readInt(),    <span class="cm">// colorArgb</span>
+        in.readShort(),  <span class="cm">// strokeWidth</span>
+        in.readInt(), in.readInt(),  <span class="cm">// x1, y1</span>
+        in.readInt(), in.readInt()   <span class="cm">// x2, y2</span>
+    );
+}
+</pre>
+
+  <h3>String Çözümleme — readString()</h3>
+<pre>
+<span class="cm">// Protokol string kuralı: [2 bayt uzunluk][UTF-8 baytlar]</span>
+<span class="kw">public static</span> <span class="tp">String</span> <span class="nm">readString</span>(<span class="tp">DataInputStream</span> in) <span class="kw">throws</span> <span class="tp">IOException</span> {
+    <span class="kw">int</span>    len   = in.readUnsignedShort(); <span class="cm">// 0-65535, işaretsiz</span>
+    <span class="kw">byte</span>[] bytes = <span class="kw">new byte</span>[len];
+    in.readFully(bytes);                   <span class="cm">// tam olarak len bayt oku</span>
+    <span class="kw">return new</span> <span class="tp">String</span>(bytes, <span class="st">"UTF-8"</span>);
+}
+</pre>
+
+  <div class="note"><strong>Neden <code>readUnsignedShort()</code>?</strong> Java'da <code>readShort()</code> işaretli döner (-32768..32767). String uzunluğu her zaman pozitif olduğundan işaretsiz (0-65535) okunması gerekir. <code>readFully()</code> ağ gecikmesi olsa bile tam sayıda bayt garantiler.</div>
+</div>
+
+<!-- ============================================================ SERVER -->
+<div class="divider"></div>
+<h1>BÖLÜM 2 — Server Paketi</h1>
+
+<!-- PaintServer -->
+<div class="class-card" id="PaintServer">
+  <div class="class-header">
+    <div class="class-icon">P</div>
+    <div class="class-title">
+      <h2>PaintServer</h2>
+      <div class="subtitle"><span class="tag server">server</span> &nbsp; Sunucu giriş noktası — tüm bileşenleri oluşturur ve bağlar</div>
+    </div>
+  </div>
+
+  <h3>Görev</h3>
+  <p>Dependency Injection kalıbıyla sunucunun tüm bileşenlerini oluşturur, birbirine bağlar ve başlatır. Handler'lar, registry, disk havuzu, otomatik kayıt ve NIO döngüsü burada bir araya gelir. <code>main()</code> metodu komut satırı argümanını (port numarası) okur.</p>
+
+<pre>
+<span class="kw">public void</span> <span class="nm">start</span>() <span class="kw">throws</span> <span class="tp">IOException</span> {
+    <span class="cm">// 1. Altyapı katmanı</span>
+    registry  = <span class="kw">new</span> <span class="tp">SessionRegistry</span>();
+    fileStore = <span class="kw">new</span> <span class="tp">FileStore</span>(filesDirPath);
+
+    <span class="cm">// 2. Disk I/O için ayrı thread havuzu (2 thread)</span>
+    <span class="cm">// NIO thread'ini bloklamak yerine disk işlemleri buraya gönderilir</span>
+    diskPool = <span class="tp">Executors</span>.newFixedThreadPool(<span class="cn">2</span>, r -&gt; {
+        <span class="tp">Thread</span> t = <span class="kw">new</span> <span class="tp">Thread</span>(r, <span class="st">"DiskPool"</span>);
+        t.setDaemon(<span class="kw">true</span>);
+        <span class="kw">return</span> t;
+    });
+
+    <span class="cm">// 3. Handler'lar — her birinin bağımlılıkları constructor'dan verilir</span>
+    <span class="tp">LoginHandler</span>     loginHandler     = <span class="kw">new</span> <span class="tp">LoginHandler</span>(registry);
+    <span class="tp">FileHandler</span>      fileHandler      = <span class="kw">new</span> <span class="tp">FileHandler</span>(fileStore, registry, diskPool);
+    <span class="tp">DrawHandler</span>      drawHandler      = <span class="kw">new</span> <span class="tp">DrawHandler</span>(registry);
+    <span class="tp">ClipboardHandler</span> clipboardHandler = <span class="kw">new</span> <span class="tp">ClipboardHandler</span>(registry);
+
+    <span class="cm">// 4. Dispatcher tüm handler'ları bir arada yönetir</span>
+    <span class="tp">MessageDispatcher</span> dispatcher = <span class="kw">new</span> <span class="tp">MessageDispatcher</span>(
+        loginHandler, fileHandler, drawHandler, clipboardHandler);
+
+    <span class="cm">// 5. Otomatik kayıt zamanlayıcısı</span>
+    autoSaveScheduler = <span class="kw">new</span> <span class="tp">AutoSaveScheduler</span>(registry, fileStore, fileHandler, <span class="cn">60</span>);
+    autoSaveScheduler.start();
+
+    <span class="cm">// 6. NIO döngüsü — son başlatılan, her şey hazır olmalı</span>
+    nioSelector = <span class="kw">new</span> <span class="tp">NIOSelector</span>(port, dispatcher, registry);
+    nioSelector.start();
+}
+
+<span class="cm">// JVM kapanırken düzgün kapatma (Ctrl+C)</span>
+<span class="tp">Runtime</span>.getRuntime().addShutdownHook(<span class="kw">new</span> <span class="tp">Thread</span>(server::stop, <span class="st">"Shutdown"</span>));
+</pre>
+
+  <div class="ok"><strong>Mimari karar:</strong> Disk I/O için 2 thread'lik ayrı havuz (DiskPool) kullanılır. Bu sayede dosya okuma/yazma işlemleri NIO thread'ini bloklamaz, diğer istemciler beklemez.</div>
+</div>
+
+<!-- NIOSelector -->
+<div class="class-card" id="NIOSelector">
+  <div class="class-header">
+    <div class="class-icon">N</div>
+    <div class="class-title">
+      <h2>NIOSelector</h2>
+      <div class="subtitle"><span class="tag server">server</span> &nbsp; Non-blocking I/O döngüsü — tek thread ile tüm istemciler yönetilir</div>
+    </div>
+  </div>
+
+  <h3>Neden NIO?</h3>
+  <p>Klasik blocking socket modelinde her istemci için ayrı bir thread açmak gerekir. N istemci = N thread demektir ve thread başına ~1 MB stack belleği harcanır. Java NIO (Non-blocking I/O) ise tek thread'in birden fazla kanalı aynı anda izlemesine olanak tanır. <code>Selector</code> sınıfı, hangi kanalın okuma/yazma için hazır olduğunu işletim sistemi düzeyinde tespit eder.</p>
+
+  <h3>Başlatma — start()</h3>
+<pre>
+<span class="kw">public void</span> <span class="nm">start</span>() <span class="kw">throws</span> <span class="tp">IOException</span> {
+    selector = <span class="tp">Selector</span>.open();               <span class="cm">// OS'a selector aç</span>
+    serverChannel = <span class="tp">ServerSocketChannel</span>.open();
+    serverChannel.configureBlocking(<span class="kw">false</span>);   <span class="cm">// KRİTİK: non-blocking mod</span>
+    serverChannel.bind(<span class="kw">new</span> <span class="tp">InetSocketAddress</span>(port));
+
+    <span class="cm">// Bu kanal yeni bağlantıları kabul edecek → OP_ACCEPT</span>
+    serverChannel.register(selector, <span class="tp">SelectionKey</span>.OP_ACCEPT);
+
+    <span class="kw">new</span> <span class="tp">Thread</span>(<span class="kw">this</span>, <span class="st">"NIO-Selector"</span>).start();
+}
+</pre>
+
+  <h3>Ana Döngü — run()</h3>
+<pre>
+<span class="kw">while</span> (running) {
+    <span class="cm">// selector.select(1000): hazır kanal yoksa en fazla 1 sn bekle</span>
+    <span class="cm">// Bu sürede keepalive kontrolü yapılabilir</span>
+    <span class="kw">int</span> ready = selector.select(<span class="cn">1000</span>);
+    <span class="kw">if</span> (ready == <span class="cn">0</span>) { checkKeepaliveTimeouts(); <span class="kw">continue</span>; }
+
+    <span class="tp">Iterator</span>&lt;<span class="tp">SelectionKey</span>&gt; iter = selector.selectedKeys().iterator();
+    <span class="kw">while</span> (iter.hasNext()) {
+        <span class="tp">SelectionKey</span> key = iter.next();
+        iter.remove(); <span class="cm">// KRİTİK: işlenen key mutlaka kaldırılmalı</span>
+        <span class="kw">if</span> (!key.isValid()) <span class="kw">continue</span>;
+
+        <span class="kw">if</span>      (key.isAcceptable()) <span class="nm">acceptClient</span>();
+        <span class="kw">else if</span> (key.isReadable())   <span class="nm">readFromClient</span>(key);
+        <span class="kw">else if</span> (key.isWritable())   <span class="nm">writeToClient</span>(key);
+    }
+    <span class="nm">flushPendingWrites</span>(); <span class="cm">// yazılacak veri olan kanalları OP_WRITE'a ekle</span>
+}
+</pre>
+
+  <h3>Yeni Bağlantı — acceptClient()</h3>
+<pre>
+<span class="kw">private void</span> <span class="nm">acceptClient</span>() <span class="kw">throws</span> <span class="tp">IOException</span> {
+    <span class="tp">SocketChannel</span> clientChannel = serverChannel.accept();
+    clientChannel.configureBlocking(<span class="kw">false</span>); <span class="cm">// istemci de non-blocking</span>
+
+    <span class="kw">int</span> sessionId = sessionIdCounter.getAndIncrement(); <span class="cm">// atomik ID üret</span>
+    <span class="tp">ClientSession</span> session = <span class="kw">new</span> <span class="tp">ClientSession</span>(sessionId, clientChannel);
+
+    <span class="cm">// Kanala session nesnesini ekle (attachment): key'den session'a erişim</span>
+    <span class="tp">SelectionKey</span> key = clientChannel.register(selector, <span class="tp">SelectionKey</span>.OP_READ);
+    key.attach(session);
+    registry.register(session);
+}
+</pre>
+
+  <h3>Okuma ve MessageFramer Entegrasyonu</h3>
+<pre>
+<span class="kw">private void</span> <span class="nm">readFromClient</span>(<span class="tp">SelectionKey</span> key) {
+    <span class="tp">ClientSession</span> session = (<span class="tp">ClientSession</span>) key.attachment();
+    <span class="kw">int</span> bytesRead = channel.read(session.readBuffer);
+    <span class="kw">if</span> (bytesRead == -<span class="cn">1</span>) { closeSession(key, session); <span class="kw">return</span>; }
+
+    session.readBuffer.flip(); <span class="cm">// yazma → okuma moduna geç</span>
+
+    <span class="cm">// Bir read çağrısında birden fazla mesaj gelebilir → döngü</span>
+    <span class="kw">while</span> (session.readBuffer.hasRemaining()) {
+        <span class="tp">Message</span> msg = <span class="tp">MessageFramer</span>.feed(session, session.readBuffer);
+        <span class="kw">if</span> (msg == <span class="kw">null</span>) <span class="kw">break</span>; <span class="cm">// mesaj henüz tamamlanmadı</span>
+
+        <span class="kw">boolean</span> keepOpen = dispatcher.dispatch(session, msg);
+        <span class="kw">if</span> (!keepOpen) { closeSession(key, session); <span class="kw">return</span>; }
+    }
+    session.readBuffer.compact(); <span class="cm">// okunmayan baytları başa taşı</span>
+}
+</pre>
+
+  <h3>Yazma Kuyruğu Sistemi</h3>
+<pre>
+<span class="cm">// Handler mesaj ekler → writeQueue'ya offer() çağırır</span>
+<span class="cm">// flushPendingWrites() kuyruğu dolu kanalları OP_WRITE'a kaydeder</span>
+<span class="kw">private void</span> <span class="nm">flushPendingWrites</span>() {
+    <span class="kw">for</span> (<span class="tp">SelectionKey</span> key : selector.keys()) {
+        <span class="tp">ClientSession</span> session = (<span class="tp">ClientSession</span>) key.attachment();
+        <span class="kw">if</span> (session != <span class="kw">null</span> &amp;&amp; !session.writeQueue.isEmpty())
+            key.interestOps(<span class="tp">SelectionKey</span>.OP_READ | <span class="tp">SelectionKey</span>.OP_WRITE);
+    }
+}
+
+<span class="cm">// writeToClient(): kuyruktan al, kanala yaz</span>
+<span class="kw">private void</span> <span class="nm">writeToClient</span>(<span class="tp">SelectionKey</span> key) {
+    <span class="kw">while</span> ((buf = session.writeQueue.peek()) != <span class="kw">null</span>) {
+        channel.write(buf);
+        <span class="kw">if</span> (buf.hasRemaining()) <span class="kw">break</span>; <span class="cm">// kanal doldu, sonraki döngüde devam</span>
+        session.writeQueue.poll(); <span class="cm">// tam yazıldı, kuyruğu temizle</span>
+    }
+    <span class="kw">if</span> (session.writeQueue.isEmpty())
+        key.interestOps(<span class="tp">SelectionKey</span>.OP_READ); <span class="cm">// artık yazma bekleme</span>
+}
+</pre>
+
+  <h3>Keepalive Zaman Aşımı Kontrolü</h3>
+<pre>
+<span class="kw">private void</span> <span class="nm">checkKeepaliveTimeouts</span>() {
+    <span class="kw">long</span> now = <span class="tp">System</span>.currentTimeMillis();
+    <span class="kw">long</span> timeoutMs = KEEPALIVE_TIMEOUT_SECONDS * <span class="cn">1000L</span>;
+    <span class="kw">for</span> (<span class="tp">SelectionKey</span> key : selector.keys()) {
+        <span class="tp">ClientSession</span> session = (<span class="tp">ClientSession</span>) key.attachment();
+        <span class="kw">if</span> (session != <span class="kw">null</span> &amp;&amp; session.isLoggedIn()) {
+            <span class="kw">if</span> (now - session.getLastPingTime() &gt; timeoutMs) {
+                closeSession(key, session); <span class="cm">// 90s ping gelmedi → kes</span>
+            }
+        }
+    }
+}
+</pre>
+
+  <div class="note"><strong>iter.remove() neden zorunlu?</strong> Selector, işlenen anahtarları otomatik temizlemez. Kaldırılmazsa aynı key sonsuz döngüde tekrar tekrar işlenir ve CPU %100'e çıkar. Bu NIO programlamasının en sık yapılan hatasıdır.</div>
+</div>
+
+<!-- MessageFramer -->
+<div class="class-card" id="MessageFramer">
+  <div class="class-header">
+    <div class="class-icon">F</div>
+    <div class="class-title">
+      <h2>MessageFramer</h2>
+      <div class="subtitle"><span class="tag server">server</span> &nbsp; TCP parçalı veri akışından tam mesajları birleştirir</div>
+    </div>
+  </div>
+
+  <h3>Problem: TCP Stream Parçalama</h3>
+  <p>TCP bir akım (stream) protokolüdür — mesaj sınırlarını bilmez. 800×600 = 480.000 piksel × 4 = ~1.9 MB'lık FILE_OPEN_DATA mesajı onlarca ayrı TCP segmentinde gelebilir. <code>channel.read()</code> her çağrıda farklı miktarda bayt döndürebilir. MessageFramer bu durumu 2 aşamalı birleştiriciyle çözer.</p>
+
+<pre>
+<span class="kw">public static</span> <span class="tp">Message</span> <span class="nm">feed</span>(<span class="tp">ClientSession</span> session, <span class="tp">ByteBuffer</span> src)
+        <span class="kw">throws</span> <span class="tp">ProtocolException</span> {
+
+    <span class="cm">// ===== AŞAMA 1: 8 baytlık başlık biriktirilene kadar bekle =====</span>
+    <span class="kw">if</span> (session.payloadBuf == <span class="kw">null</span>) {
+        transfer(src, session.headerBuf);         <span class="cm">// gelen baytları headerBuf'a taşı</span>
+        <span class="kw">if</span> (session.headerBuf.hasRemaining()) <span class="kw">return null</span>; <span class="cm">// daha eksik</span>
+
+        session.headerBuf.flip();
+        <span class="kw">int</span> hi = session.headerBuf.get() &amp; <span class="cn">0xFF</span>;
+        <span class="kw">int</span> lo = session.headerBuf.get() &amp; <span class="cn">0xFF</span>;
+
+        <span class="cm">// Magic kontrolü: 0xCA 0xFE değilse protokol hatası</span>
+        <span class="kw">if</span> (hi != MAGIC_HI || lo != MAGIC_LO)
+            <span class="kw">throw new</span> <span class="tp">ProtocolException</span>(<span class="st">"Invalid magic"</span>);
+
+        session.headerBuf.get();                  <span class="cm">// VERSION (şimdilik yok sayılır)</span>
+        session.pendingTypeCode = session.headerBuf.get(); <span class="cm">// TYPE</span>
+        <span class="kw">int</span> payloadLen = session.headerBuf.getInt();       <span class="cm">// PAYLOAD_LEN</span>
+        session.headerBuf.clear();                <span class="cm">// sonraki mesaj için hazırla</span>
+
+        <span class="kw">if</span> (payloadLen &lt; <span class="cn">0</span> || payloadLen &gt; MAX_PAYLOAD_SIZE)
+            <span class="kw">throw new</span> <span class="tp">ProtocolException</span>(<span class="st">"Payload too large: "</span> + payloadLen);
+
+        <span class="cm">// Tam bu boyutta payload buffer aç</span>
+        session.payloadBuf = <span class="tp">ByteBuffer</span>.allocate(payloadLen);
+    }
+
+    <span class="cm">// ===== AŞAMA 2: payload dolana kadar bekle =====</span>
+    transfer(src, session.payloadBuf);
+    <span class="kw">if</span> (session.payloadBuf.hasRemaining()) <span class="kw">return null</span>; <span class="cm">// henüz eksik</span>
+
+    <span class="cm">// Mesaj tamam — Message nesnesine çevir, payloadBuf sıfırla</span>
+    <span class="kw">byte</span>[] payload = session.payloadBuf.array();
+    session.payloadBuf = <span class="kw">null</span>;
+    <span class="kw">return</span> <span class="tp">Message</span>.of(<span class="tp">MessageType</span>.fromCode(session.pendingTypeCode), payload);
+}
+
+<span class="cm">// Kaynak buffer'dan hedef buffer'a en fazla dst.remaining() kadar kopyala</span>
+<span class="kw">private static void</span> <span class="nm">transfer</span>(<span class="tp">ByteBuffer</span> src, <span class="tp">ByteBuffer</span> dst) {
+    <span class="kw">int</span> n = Math.min(src.remaining(), dst.remaining());
+    <span class="kw">if</span> (n == <span class="cn">0</span>) <span class="kw">return</span>;
+    <span class="kw">int</span> oldLimit = src.limit();
+    src.limit(src.position() + n); <span class="cm">// src'yi geçici olarak sınırla</span>
+    dst.put(src);
+    src.limit(oldLimit);
+}
+</pre>
+
+  <div class="info"><strong>Durum headerBuf veya payloadBuf içinde taşınır:</strong> Eğer <code>payloadBuf != null</code> ise Aşama 2'deyiz demektir. Bir sonraki <code>feed()</code> çağrısında kaldığımız yerden devam ederiz. Bu durum bilgisi <code>ClientSession</code> nesnesinde saklanır.</div>
+</div>
+
+<!-- MessageDispatcher -->
+<div class="class-card" id="MessageDispatcher">
+  <div class="class-header">
+    <div class="class-icon">D</div>
+    <div class="class-title">
+      <h2>MessageDispatcher</h2>
+      <div class="subtitle"><span class="tag server">server</span> &nbsp; FSM durumuna göre gelen mesajları doğru handler'a yönlendirir</div>
+    </div>
+  </div>
+
+<pre>
+<span class="kw">public boolean</span> <span class="nm">dispatch</span>(<span class="tp">ClientSession</span> session, <span class="tp">Message</span> msg) {
+    <span class="kw">switch</span> (session.getState()) {
+        <span class="kw">case</span> HANDSHAKE:
+            <span class="cm">// Yalnızca LOGIN_REQ kabul edilir</span>
+            <span class="kw">if</span> (msg.getType() != <span class="tp">MessageType</span>.LOGIN_REQ) {
+                enqueue(session, encodeError(<span class="st">"Login required first"</span>));
+                session.transitionTo(FSMState.ERROR);
+                <span class="kw">return false</span>; <span class="cm">// bağlantıyı kapat</span>
+            }
+            loginHandler.handle(session, msg);
+            <span class="kw">return true</span>;
+
+        <span class="kw">case</span> ACTIVE:
+            <span class="kw">return</span> <span class="nm">dispatchActive</span>(session, msg);
+
+        <span class="kw">case</span> SAVING:
+            <span class="cm">// Diske yazım sırasında sadece PING kabul edilir</span>
+            <span class="kw">if</span> (msg.getType() == <span class="tp">MessageType</span>.PING) {
+                enqueue(session, encodePong());
+                session.updatePingTime();
+            }
+            <span class="kw">return true</span>; <span class="cm">// diğer mesajlar yok sayılır</span>
+    }
+}
+
+<span class="kw">private boolean</span> <span class="nm">dispatchActive</span>(<span class="tp">ClientSession</span> session, <span class="tp">Message</span> msg) {
+    <span class="kw">switch</span> (msg.getType()) {
+        <span class="kw">case</span> FILE_CREATE_REQ:   fileHandler.handleCreate(session, msg);    <span class="kw">break</span>;
+        <span class="kw">case</span> FILE_OPEN_REQ:     fileHandler.handleOpen(session, msg);      <span class="kw">break</span>;
+        <span class="kw">case</span> FILE_SAVE_REQ:
+            session.transitionTo(FSMState.SAVING);  <span class="cm">// önce durum değişir</span>
+            fileHandler.handleSave(session, msg);   <span class="cm">// sonra disk thread'e gönder</span>
+            <span class="kw">break</span>;
+        <span class="kw">case</span> DRAW_EVENT:        drawHandler.handle(session, msg);          <span class="kw">break</span>;
+        <span class="kw">case</span> CANVAS_SNAPSHOT_DATA: fileHandler.handleSnapshotData(session, msg); <span class="kw">break</span>;
+        <span class="kw">case</span> CLIPBOARD_COPY:
+        <span class="kw">case</span> CLIPBOARD_CUT:     clipboardHandler.handleCopyOrCut(session, msg); <span class="kw">break</span>;
+        <span class="kw">case</span> CLIPBOARD_PASTE_REQ: clipboardHandler.handlePasteReq(session, msg); <span class="kw">break</span>;
+        <span class="kw">case</span> PING:
+            enqueue(session, encodePong()); session.updatePingTime(); <span class="kw">break</span>;
+    }
+    <span class="kw">return true</span>;
+}
+</pre>
+
+  <div class="info"><strong>FILE_SAVE_REQ özel durumu:</strong> Durum geçişi (<code>SAVING</code>) disk işlemi başlamadan önce yapılır. Bu sayede disk thread'i çalışırken gelen başka mesajlar yok sayılır. Yazım bitince FileHandler ACTIVE'e geri döner.</div>
+</div>
+
+<!-- ClientSession -->
+<div class="class-card" id="ClientSession">
+  <div class="class-header">
+    <div class="class-icon">S</div>
+    <div class="class-title">
+      <h2>ClientSession</h2>
+      <div class="subtitle"><span class="tag server">server</span> &nbsp; Bir istemci bağlantısının tüm durumunu tutan veri nesnesi</div>
+    </div>
+  </div>
+
+  <h3>Barındırdığı Veriler</h3>
+<pre>
+<span class="kw">public class</span> <span class="tp">ClientSession</span> {
+    <span class="cm">// Kimlik</span>
+    <span class="kw">private final int</span>          sessionId;
+    <span class="kw">private final</span> <span class="tp">SocketChannel</span> channel;
+    <span class="kw">private</span>       <span class="tp">FSMState</span>       state = <span class="tp">FSMState</span>.HANDSHAKE;
+    <span class="kw">private</span>       <span class="tp">String</span>         username = <span class="kw">null</span>;
+
+    <span class="cm">// NIO frame birleştirme (MessageFramer kullanır)</span>
+    <span class="kw">public final</span>  <span class="tp">ByteBuffer</span>     readBuffer;   <span class="cm">// 64 KB gelen ham baytlar</span>
+    <span class="kw">final</span>         <span class="tp">ByteBuffer</span>     headerBuf;   <span class="cm">// 8 bayt başlık biriktiricisi</span>
+    <span class="kw">volatile</span>      <span class="tp">ByteBuffer</span>     payloadBuf;  <span class="cm">// null=Aşama1, dolu=Aşama2</span>
+    <span class="kw">byte</span>                         pendingTypeCode;
+
+    <span class="cm">// Giden mesaj kuyruğu — ConcurrentLinkedQueue: thread-safe, lock-free</span>
+    <span class="kw">public final</span> <span class="tp">ConcurrentLinkedQueue</span>&lt;<span class="tp">ByteBuffer</span>&gt; writeQueue;
+
+    <span class="cm">// Açık dosyalar ve pano</span>
+    <span class="kw">private final</span> <span class="tp">Set</span>&lt;<span class="tp">Integer</span>&gt; openFileIds = <span class="kw">new</span> <span class="tp">HashSet</span>&lt;&gt;();
+    <span class="kw">private byte</span>[]              clipboardData;
+    <span class="kw">private int</span>                 clipboardWidth, clipboardHeight;
+
+    <span class="cm">// Keepalive</span>
+    <span class="kw">private long</span>                lastPingTime = <span class="tp">System</span>.currentTimeMillis();
+}
+</pre>
+
+  <div class="info"><strong>writeQueue neden ConcurrentLinkedQueue?</strong> Handler sınıfları diskPool thread'inden mesaj ekler, NIO thread'i kuyruktan okur. İkisi eş zamanlı çalışır. <code>ConcurrentLinkedQueue</code> lock-free olduğundan hem thread-safe hem yüksek performanslıdır.</div>
+</div>
+
+<!-- SESSION REGISTRY -->
+<div class="class-card" id="SessionRegistry">
+  <div class="class-header">
+    <div class="class-icon">R</div>
+    <div class="class-title">
+      <h2>SessionRegistry</h2>
+      <div class="subtitle"><span class="tag store">store</span> &nbsp; Aktif oturumların merkezi kaydı — broadcast merkezi</div>
+    </div>
+  </div>
+
+<pre>
+<span class="kw">public class</span> <span class="tp">SessionRegistry</span> {
+    <span class="cm">// İki index: sessionId ile ve kullanıcı adı ile hızlı erişim</span>
+    <span class="kw">private final</span> <span class="tp">Map</span>&lt;<span class="tp">Integer</span>, <span class="tp">ClientSession</span>&gt; bySessionId = <span class="kw">new</span> <span class="tp">ConcurrentHashMap</span>&lt;&gt;();
+    <span class="kw">private final</span> <span class="tp">Map</span>&lt;<span class="tp">String</span>,  <span class="tp">ClientSession</span>&gt; byUsername   = <span class="kw">new</span> <span class="tp">ConcurrentHashMap</span>&lt;&gt;();
+
+    <span class="cm">// Belirli bir dosyayı açık olan tüm oturumları döndür</span>
+    <span class="kw">public</span> <span class="tp">List</span>&lt;<span class="tp">ClientSession</span>&gt; <span class="nm">getSessionsWithFileOpen</span>(<span class="kw">int</span> fileId) {
+        <span class="tp">List</span>&lt;<span class="tp">ClientSession</span>&gt; result = <span class="kw">new</span> <span class="tp">ArrayList</span>&lt;&gt;();
+        <span class="kw">for</span> (<span class="tp">ClientSession</span> s : bySessionId.values())
+            <span class="kw">if</span> (s.isLoggedIn() &amp;&amp; s.hasFileOpen(fileId)) result.add(s);
+        <span class="kw">return</span> result;
+    }
+
+    <span class="cm">// Tüm giriş yapmış istemcilere yayın (göndereni hariç tut)</span>
+    <span class="kw">public void</span> <span class="nm">broadcastToAll</span>(<span class="kw">byte</span>[] encoded, <span class="kw">int</span> excludeSessionId) {
+        <span class="kw">for</span> (<span class="tp">ClientSession</span> s : bySessionId.values())
+            <span class="kw">if</span> (s.getSessionId() != excludeSessionId &amp;&amp; s.isLoggedIn())
+                s.writeQueue.offer(<span class="tp">ByteBuffer</span>.wrap(encoded));
+    }
+
+    <span class="cm">// Yalnızca belirtilen dosyayı açık olan istemcilere yayın</span>
+    <span class="kw">public void</span> <span class="nm">broadcastToFileViewers</span>(<span class="kw">int</span> fileId, <span class="kw">byte</span>[] encoded, <span class="kw">int</span> excludeSessionId) {
+        <span class="kw">for</span> (<span class="tp">ClientSession</span> s : getSessionsWithFileOpen(fileId))
+            <span class="kw">if</span> (s.getSessionId() != excludeSessionId)
+                s.writeQueue.offer(<span class="tp">ByteBuffer</span>.wrap(encoded));
+    }
+}
+</pre>
+
+  <div class="ok"><strong>broadcastToFileViewers() kritik önemi:</strong> DRAW_EVENT, CANVAS_UPDATE ve CLIPBOARD_DATA için sadece aynı dosyayı açık olan istemcilere gönderim yapılır. Bu sayede farklı dosyalar üzerinde çalışan istemciler birbirlerinin mesajlarıyla ilgilenmez.</div>
+</div>
+
+<!-- FileMetadata -->
+<div class="class-card" id="FileMetadata">
+  <div class="class-header">
+    <div class="class-icon">M</div>
+    <div class="class-title">
+      <h2>FileMetadata</h2>
+      <div class="subtitle"><span class="tag store">store</span> &nbsp; Bir dosyanın meta verilerini bellekte tutan POJO</div>
+    </div>
+  </div>
+  <p>Dosya kimliği, adı, sahibi, boyutları ve son değiştirilme zamanını tutar. Disk'e yazmadan önce bu meta veriden fiziksel dosya yolu (<code>file_&lt;id&gt;.png</code>) üretilir. <code>lastModified</code> alanı otomatik kayıt ve dosya listesi görünümünde kullanılır.</p>
+</div>
+
+<!-- FileStore -->
+<div class="class-card" id="FileStore">
+  <div class="class-header">
+    <div class="class-icon">F</div>
+    <div class="class-title">
+      <h2>FileStore</h2>
+      <div class="subtitle"><span class="tag store">store</span> &nbsp; Dosya oluşturma, okuma, yazma, silme — disk I/O merkezi</div>
+    </div>
+  </div>
+
+<pre>
+<span class="cm">// Pixsel verisi ↔ BufferedImage dönüşümü</span>
+<span class="kw">public static byte</span>[] <span class="nm">imageToPixelBytes</span>(<span class="tp">BufferedImage</span> img, <span class="kw">int</span> w, <span class="kw">int</span> h) {
+    <span class="kw">int</span>[]  pixels = img.getRGB(<span class="cn">0</span>, <span class="cn">0</span>, w, h, <span class="kw">null</span>, <span class="cn">0</span>, w); <span class="cm">// ARGB int dizisi</span>
+    <span class="kw">byte</span>[] data   = <span class="kw">new byte</span>[pixels.length * <span class="cn">4</span>];
+    <span class="kw">for</span> (<span class="kw">int</span> i = <span class="cn">0</span>; i &lt; pixels.length; i++) {
+        <span class="kw">int</span> base    = i * <span class="cn">4</span>;
+        data[base]  = (<span class="kw">byte</span>) ((pixels[i] &gt;&gt; <span class="cn">24</span>) &amp; <span class="cn">0xFF</span>); <span class="cm">// A</span>
+        data[base+<span class="cn">1</span>]= (<span class="kw">byte</span>) ((pixels[i] &gt;&gt; <span class="cn">16</span>) &amp; <span class="cn">0xFF</span>); <span class="cm">// R</span>
+        data[base+<span class="cn">2</span>]= (<span class="kw">byte</span>) ((pixels[i] &gt;&gt;  <span class="cn">8</span>) &amp; <span class="cn">0xFF</span>); <span class="cm">// G</span>
+        data[base+<span class="cn">3</span>]= (<span class="kw">byte</span>)  (pixels[i]        &amp; <span class="cn">0xFF</span>); <span class="cm">// B</span>
+    }
+    <span class="kw">return</span> data;
+}
+</pre>
+
+  <div class="info">Dosyalar sunucuda <code>files/file_1.png</code>, <code>files/file_2.png</code> şeklinde PNG olarak saklanır. Protokolde ise ham ARGB bayt dizisi olarak taşınır. Okuma: PNG → ARGB bytes. Yazma: ARGB bytes → PNG.</div>
+</div>
+
+<!-- AutoSaveScheduler -->
+<div class="class-card" id="AutoSaveScheduler">
+  <div class="class-header">
+    <div class="class-icon">A</div>
+    <div class="class-title">
+      <h2>AutoSaveScheduler</h2>
+      <div class="subtitle"><span class="tag store">store</span> &nbsp; 60 saniyede bir açık dosyaları otomatik kaydeder</div>
+    </div>
+  </div>
+
+<pre>
+<span class="kw">public void</span> <span class="nm">start</span>() {
+    scheduler = <span class="tp">Executors</span>.newSingleThreadScheduledExecutor(...);
+    scheduler.scheduleAtFixedRate(
+        <span class="kw">this</span>::runAutoSave,
+        intervalSeconds,   <span class="cm">// ilk gecikme (60s)</span>
+        intervalSeconds,   <span class="cm">// tekrar aralığı (60s)</span>
+        <span class="tp">TimeUnit</span>.SECONDS
+    );
+}
+
+<span class="kw">private void</span> <span class="nm">runAutoSave</span>() {
+    <span class="cm">// Tüm oturumlardan açık dosya ID'lerini topla</span>
+    <span class="tp">Set</span>&lt;<span class="tp">Integer</span>&gt; openFileIds = <span class="kw">new</span> <span class="tp">HashSet</span>&lt;&gt;();
+    <span class="kw">for</span> (<span class="tp">ClientSession</span> s : registry.getAllSessions())
+        openFileIds.addAll(s.getOpenFileIds());
+
+    <span class="cm">// Her açık dosyayı diske yaz</span>
+    <span class="kw">for</span> (<span class="kw">int</span> fileId : openFileIds) {
+        <span class="kw">byte</span>[] pixelData = fileStore.readFile(fileId);
+        fileHandler.performAutoSave(fileId, pixelData); <span class="cm">// disk thread'e gönder</span>
+    }
+}
+</pre>
+</div>
+
+<!-- LOGIN HANDLER -->
+<div class="class-card" id="LoginHandler">
+  <div class="class-header">
+    <div class="class-icon">L</div>
+    <div class="class-title">
+      <h2>LoginHandler</h2>
+      <div class="subtitle"><span class="tag handler">handler</span> &nbsp; Kullanıcı giriş doğrulaması ve HANDSHAKE → ACTIVE geçişi</div>
+    </div>
+  </div>
+
+<pre>
+<span class="kw">private static final</span> <span class="tp">Pattern</span> VALID_USERNAME = <span class="tp">Pattern</span>.compile(<span class="st">"[a-zA-Z0-9_]{3,16}"</span>);
+
+<span class="kw">public void</span> <span class="nm">handle</span>(<span class="tp">ClientSession</span> session, <span class="tp">Message</span> msg) <span class="kw">throws</span> <span class="tp">IOException</span> {
+    <span class="tp">String</span> username = <span class="tp">MessageDecoder</span>.decodeLoginReq(msg.getPayload()).username;
+
+    <span class="cm">// Kural 1: Geçerli karakter seti (regex)</span>
+    <span class="kw">if</span> (!VALID_USERNAME.matcher(username).matches()) {
+        enqueue(session, encodeLoginErr((<span class="kw">byte</span>) <span class="cn">0x02</span>, <span class="st">"Invalid chars"</span>));
+        <span class="kw">return</span>; <span class="cm">// HANDSHAKE'de kal, tekrar denenebilir</span>
+    }
+
+    <span class="cm">// Kural 2: Kullanıcı adı başka biri tarafından kullanılmıyor mu?</span>
+    <span class="kw">if</span> (registry.isUsernameTaken(username)) {
+        enqueue(session, encodeLoginErr((<span class="kw">byte</span>) <span class="cn">0x01</span>, <span class="st">"Username taken"</span>));
+        <span class="kw">return</span>;
+    }
+
+    <span class="cm">// Geçerli: oturumu aktiflestir</span>
+    session.setUsername(username);
+    session.transitionTo(<span class="tp">FSMState</span>.ACTIVE);      <span class="cm">// FSM geçişi</span>
+    registry.registerUsername(session);
+
+    enqueue(session, encodeLoginOk(session.getSessionId()));
+
+    <span class="cm">// Diğer istemcilere yeni kullanıcının bağlandığını bildir</span>
+    registry.broadcastToAll(encodeUserJoin(username), session.getSessionId());
+}
+</pre>
+</div>
+
+<!-- DRAW HANDLER -->
+<div class="class-card" id="DrawHandler">
+  <div class="class-header">
+    <div class="class-icon">D</div>
+    <div class="class-title">
+      <h2>DrawHandler</h2>
+      <div class="subtitle"><span class="tag handler">handler</span> &nbsp; Çizim olayını alır, göndereni ekler, aynı dosya izleyicilerine yayınlar</div>
+    </div>
+  </div>
+
+<pre>
+<span class="kw">public void</span> <span class="nm">handle</span>(<span class="tp">ClientSession</span> session, <span class="tp">Message</span> msg) <span class="kw">throws</span> <span class="tp">IOException</span> {
+    <span class="tp">DrawEventPayload</span> event = <span class="tp">MessageDecoder</span>.decodeDrawEvent(msg.getPayload());
+    session.addOpenFile(event.fileId); <span class="cm">// ilk DRAW_EVENT dosyayı açık sayar</span>
+
+    <span class="cm">// DRAW_EVENT'e göndericinin adını ekleyip DRAW_BROADCAST yap</span>
+    <span class="kw">byte</span>[] broadcast = <span class="tp">MessageEncoder</span>.encodeDrawBroadcast(
+        event.fileId, session.getUsername(),
+        event.toolType, event.colorArgb, event.strokeWidth,
+        event.x1, event.y1, event.x2, event.y2
+    );
+
+    <span class="cm">// Sadece aynı dosyayı açık olan, gönderen hariç herkese yayınla</span>
+    registry.broadcastToFileViewers(event.fileId, broadcast, session.getSessionId());
+}
+</pre>
+
+  <div class="info">DrawHandler projedeki en sade handler'dır: decode → kullanıcı adı ekle → broadcast. Sunucu çizim işlemini kendisi uygulamaz; sadece diğer istemcilere iletir. Her istemci kendi canvasına uygular.</div>
+</div>
+
+<!-- FILE HANDLER -->
+<div class="class-card" id="FileHandler">
+  <div class="class-header">
+    <div class="class-icon">F</div>
+    <div class="class-title">
+      <h2>FileHandler</h2>
+      <div class="subtitle"><span class="tag handler">handler</span> &nbsp; Dosya CRUD işlemleri, canvas senkronizasyonu ve undo yayını</div>
+    </div>
+  </div>
+
+  <h3>Canvas Senkronizasyonu — handleOpen()</h3>
+<pre>
+<span class="kw">public void</span> <span class="nm">handleOpen</span>(<span class="tp">ClientSession</span> session, <span class="tp">Message</span> msg) {
+    <span class="kw">int</span> fileId = <span class="tp">MessageDecoder</span>.decodeFileOpenReq(msg.getPayload());
+    session.addOpenFile(fileId);
+
+    <span class="tp">List</span>&lt;<span class="tp">ClientSession</span>&gt; activeViewers = registry.getSessionsWithFileOpen(fileId);
+    <span class="cm">// Gelen oturumu hariç tut (kendisi henüz eklendi)</span>
+    activeViewers.removeIf(s -&gt; s.getSessionId() == session.getSessionId());
+
+    <span class="kw">if</span> (!activeViewers.isEmpty()) {
+        <span class="cm">// Aktif görüntüleyici var → diskten eski veri yerine canlı canvas iste</span>
+        pendingOpens.computeIfAbsent(fileId, k -&gt; <span class="kw">new</span> <span class="tp">ArrayList</span>&lt;&gt;())
+            .add(<span class="kw">new</span> <span class="tp">PendingOpenRequest</span>(session, meta));
+        enqueue(activeViewers.get(<span class="cn">0</span>), encodeCanvasSnapshotReq(fileId));
+    } <span class="kw">else</span> {
+        <span class="cm">// Kimse açmamış → diskten oku (disk thread'inde)</span>
+        diskPool.submit(() -&gt; {
+            <span class="kw">byte</span>[] pixelData = fileStore.readFile(fileId);
+            enqueue(session, encodeFileOpenData(fileId, ..., pixelData));
+        });
+    }
+}
+</pre>
+
+  <h3>Snapshot Geldi — handleSnapshotData()</h3>
+<pre>
+<span class="kw">public void</span> <span class="nm">handleSnapshotData</span>(<span class="tp">ClientSession</span> session, <span class="tp">Message</span> msg) {
+    <span class="tp">CanvasSnapshotDataPayload</span> snap = <span class="tp">MessageDecoder</span>.decodeCanvasSnapshotData(msg.getPayload());
+
+    <span class="cm">// 1. Bekleyen yeni istemcilere gönder (canvas senkronizasyonu)</span>
+    <span class="tp">List</span>&lt;<span class="tp">PendingOpenRequest</span>&gt; pending = pendingOpens.remove(snap.fileId);
+    <span class="kw">if</span> (pending != <span class="kw">null</span>) {
+        <span class="kw">for</span> (<span class="tp">PendingOpenRequest</span> req : pending)
+            enqueue(req.waitingSession, encodeFileOpenData(snap.fileId, ..., snap.pixelData));
+    }
+
+    <span class="cm">// 2. Undo senkronizasyonu: diğer tüm görüntüleyicilere CANVAS_UPDATE yayınla</span>
+    <span class="kw">byte</span>[] update = encodeCanvasUpdate(snap.fileId, snap.width, snap.height, snap.pixelData);
+    registry.broadcastToFileViewers(snap.fileId, update, session.getSessionId());
+}
+</pre>
+
+  <div class="note"><strong>Bu metot iki farklı senaryoyu aynı anda çözer:</strong> (1) Yeni kullanıcı katılınca aktif canvas'ı alır, (2) Kullanıcı undo yapınca diğerlerine senkronize eder. Her iki durumda da istemci CANVAS_SNAPSHOT_DATA gönderir, sunucu aynı kodu çalıştırır.</div>
+</div>
+
+<!-- CLIPBOARD HANDLER -->
+<div class="class-card" id="ClipboardHandler">
+  <div class="class-header">
+    <div class="class-icon">C</div>
+    <div class="class-title">
+      <h2>ClipboardHandler</h2>
+      <div class="subtitle"><span class="tag handler">handler</span> &nbsp; Pano verisi saklama ve yapıştırma yayını</div>
+    </div>
+  </div>
+
+<pre>
+<span class="cm">// Kopyala veya Kes: pixeli oturuma özgü panoya kaydet</span>
+<span class="kw">public void</span> <span class="nm">handleCopyOrCut</span>(<span class="tp">ClientSession</span> session, <span class="tp">Message</span> msg) {
+    <span class="tp">ClipboardRegionPayload</span> req = <span class="tp">MessageDecoder</span>.decodeClipboardRegion(msg.getPayload());
+    session.setClipboard(req.pixelData, req.rw, req.rh); <span class="cm">// sunucu panoya alır</span>
+}
+
+<span class="cm">// Yapıştır: pano verisini hem isteyene hem dosya izleyicilerine gönder</span>
+<span class="kw">public void</span> <span class="nm">handlePasteReq</span>(<span class="tp">ClientSession</span> session, <span class="tp">Message</span> msg) {
+    <span class="kw">if</span> (!session.hasClipboard()) {
+        enqueue(session, encodeError(<span class="st">"Clipboard is empty"</span>)); <span class="kw">return</span>;
+    }
+    <span class="tp">ClipboardPasteReqPayload</span> req = <span class="tp">MessageDecoder</span>.decodeClipboardPasteReq(msg.getPayload());
+    <span class="cm">// Mesaj içinde hedef koordinat (fareyi tıklama noktası) var</span>
+    <span class="kw">byte</span>[] clipboardMsg = encodeClipboardData(
+        req.fileId, req.x, req.y,
+        session.getClipboardWidth(), session.getClipboardHeight(),
+        session.getClipboardData()
+    );
+    enqueue(session, clipboardMsg);                               <span class="cm">// isteyen</span>
+    registry.broadcastToFileViewers(req.fileId, clipboardMsg,    <span class="cm">// diğerleri</span>
+        session.getSessionId());
+}
+</pre>
+
+  <div class="info">Pano verisi sunucuda <code>ClientSession</code>'a özgü saklanır. Kullanıcı A kopyalar, B'nin panosu değişmez. A yapıştırınca sunucu A'nın pano verisini hem A'ya hem B'ye gönderir — koordinatlar PASTE_REQ'dan alınır.</div>
+</div>
+
+<!-- ============================================================ CLIENT -->
+<div class="divider"></div>
+<h1>BÖLÜM 3 — Client Paketi</h1>
+
+<!-- PaintClient -->
+<div class="class-card" id="PaintClient">
+  <div class="class-header">
+    <div class="class-icon">P</div>
+    <div class="class-title">
+      <h2>PaintClient</h2>
+      <div class="subtitle"><span class="tag client">client</span> &nbsp; İstemci giriş noktası — Swing EDT'de GUI başlatır</div>
+    </div>
+  </div>
+
+<pre>
+<span class="kw">public static void</span> <span class="nm">main</span>(<span class="tp">String</span>[] args) {
+    <span class="cm">// Sistem görünümü: Windows'ta Windows Native, Mac'te Aqua gibi görünür</span>
+    <span class="tp">UIManager</span>.setLookAndFeel(<span class="tp">UIManager</span>.getSystemLookAndFeelClassName());
+
+    <span class="cm">// KRİTİK: Tüm Swing işlemleri EDT (Event Dispatch Thread) üzerinde yapılmalı</span>
+    <span class="tp">SwingUtilities</span>.invokeLater(() -&gt; {
+        <span class="tp">MainFrame</span> frame = <span class="kw">new</span> <span class="tp">MainFrame</span>();
+        frame.setVisible(<span class="kw">true</span>);
+        frame.showLoginDialog();  <span class="cm">// uygulama açılınca login ekranı göster</span>
+    });
+}
+</pre>
+</div>
+
+<!-- ConnectionManager -->
+<div class="class-card" id="ConnectionManager">
+  <div class="class-header">
+    <div class="class-icon">C</div>
+    <div class="class-title">
+      <h2>ConnectionManager</h2>
+      <div class="subtitle"><span class="tag client">client</span> &nbsp; TCP bağlantı yöneticisi, PING zamanlayıcısı, mesaj gönderme API'si</div>
+    </div>
+  </div>
+
+<pre>
+<span class="kw">public synchronized void</span> <span class="nm">connect</span>(<span class="tp">String</span> host, <span class="kw">int</span> port) <span class="kw">throws</span> <span class="tp">IOException</span> {
+    state = <span class="tp">FSMState</span>.CONNECTING;
+    socket = <span class="kw">new</span> <span class="tp">Socket</span>(host, port);
+    socket.setTcpNoDelay(<span class="kw">true</span>); <span class="cm">// Nagle algoritmasını kapat — küçük paketler anında gider</span>
+
+    writer = <span class="kw">new</span> <span class="tp">NetworkWriter</span>(); writer.start(socket.getOutputStream());
+    reader = <span class="kw">new</span> <span class="tp">NetworkReader</span>(messageHandler, this::handleDisconnect);
+    reader.start(socket.getInputStream());
+
+    state = <span class="tp">FSMState</span>.LOGGING_IN;
+
+    <span class="cm">// PING zamanlayıcısı: 30s'de bir PING gönder (sunucu 90s'de timeout verir)</span>
+    pingScheduler.scheduleAtFixedRate(() -&gt; {
+        <span class="kw">if</span> (state == <span class="tp">FSMState</span>.CONNECTED) sendPing();
+    }, <span class="cn">30</span>, <span class="cn">30</span>, <span class="tp">TimeUnit</span>.SECONDS);
+}
+</pre>
+
+  <div class="info"><code>setTcpNoDelay(true)</code> Nagle algoritmasını devre dışı bırakır. Nagle küçük paketleri biriktirerek büyük paket yapar — latency artar. Gerçek zamanlı çizim için her DRAW_EVENT anında iletilmeli, bu yüzden Nagle kapatılır.</div>
+</div>
+
+<!-- NetworkReader -->
+<div class="class-card" id="NetworkReader">
+  <div class="class-header">
+    <div class="class-icon">R</div>
+    <div class="class-title">
+      <h2>NetworkReader</h2>
+      <div class="subtitle"><span class="tag client">client</span> &nbsp; Daemon thread: sunucudan mesaj okur, EDT'de teslim eder</div>
+    </div>
+  </div>
+
+<pre>
+<span class="kw">public void</span> <span class="nm">run</span>() {
+    <span class="tp">DataInputStream</span> dis = <span class="kw">new</span> <span class="tp">DataInputStream</span>(in);
+    <span class="kw">while</span> (running) {
+        <span class="tp">Message</span> msg = readNextFrame(dis);           <span class="cm">// bloklamalı okuma</span>
+        <span class="tp">SwingUtilities</span>.invokeLater(() -&gt; onMessage.accept(msg)); <span class="cm">// EDT'ye taşı</span>
+    }
+    <span class="tp">SwingUtilities</span>.invokeLater(onDisconnect);        <span class="cm">// bağlantı kesildi</span>
+}
+
+<span class="kw">private</span> <span class="tp">Message</span> <span class="nm">readNextFrame</span>(<span class="tp">DataInputStream</span> dis) <span class="kw">throws</span> <span class="tp">IOException</span> {
+    <span class="kw">byte</span> hi = dis.readByte(), lo = dis.readByte();    <span class="cm">// MAGIC</span>
+    <span class="cm">// ... magic kontrolü ...</span>
+    dis.readByte();                                    <span class="cm">// VERSION</span>
+    <span class="kw">byte</span> typeCode  = dis.readByte();                  <span class="cm">// TYPE</span>
+    <span class="kw">int</span>  payloadLen = dis.readInt();                  <span class="cm">// PAYLOAD_LEN</span>
+    <span class="kw">byte</span>[] payload = <span class="kw">new byte</span>[payloadLen];
+    dis.readFully(payload);                           <span class="cm">// tam payload oku</span>
+    <span class="kw">return</span> <span class="tp">Message</span>.of(<span class="tp">MessageType</span>.fromCode(typeCode), payload);
+}
+</pre>
+
+  <div class="note"><strong>SwingUtilities.invokeLater() neden gerekli?</strong> Swing thread-safe değildir. GUI güncellemeleri (canvas boyama, label değişimi) mutlaka EDT'de yapılmalıdır. NetworkReader ayrı bir daemon thread'de çalışır. invokeLater() mesajı EDT kuyruğuna ekler.</div>
+</div>
+
+<!-- NetworkWriter -->
+<div class="class-card" id="NetworkWriter">
+  <div class="class-header">
+    <div class="class-icon">W</div>
+    <div class="class-title">
+      <h2>NetworkWriter</h2>
+      <div class="subtitle"><span class="tag client">client</span> &nbsp; Daemon thread: yazma kuyruğunu drene ederek sunucuya gönderir</div>
+    </div>
+  </div>
+
+<pre>
+<span class="kw">private final</span> <span class="tp">BlockingQueue</span>&lt;<span class="kw">byte</span>[]&gt; writeQueue = <span class="kw">new</span> <span class="tp">LinkedBlockingQueue</span>&lt;&gt;();
+
+<span class="cm">// Herhangi bir thread'den çağrılabilir — thread-safe</span>
+<span class="kw">public void</span> <span class="nm">send</span>(<span class="kw">byte</span>[] data) {
+    <span class="kw">if</span> (running) writeQueue.offer(data); <span class="cm">// kuyruğa ekle, hemen dön</span>
+}
+
+<span class="kw">public void</span> <span class="nm">run</span>() {
+    <span class="kw">while</span> (running) {
+        <span class="kw">byte</span>[] data = writeQueue.take(); <span class="cm">// kuyruk boşsa burada bekler (block)</span>
+        out.write(data);
+        out.flush();
+    }
+}
+</pre>
+
+  <div class="ok"><code>send()</code> çağıran thread'i bloklamaz — veriyi kuyruğa ekler ve döner. Writer thread'i <code>BlockingQueue.take()</code>'de bekler, veri gelince yazar. Bu producter-consumer kalıbının klasik uygulamasıdır.</div>
+</div>
+
+<!-- CanvasPanel -->
+<div class="class-card" id="CanvasPanel">
+  <div class="class-header">
+    <div class="class-icon">C</div>
+    <div class="class-title">
+      <h2>CanvasPanel</h2>
+      <div class="subtitle"><span class="tag client">client</span> &nbsp; Çizim yüzeyi — çift buffer rendering, undo stack, flood fill, seçim modu</div>
+    </div>
+  </div>
+
+  <h3>Çift Buffer Tasarımı</h3>
+<pre>
+<span class="kw">private</span> <span class="tp">BufferedImage</span> backBuffer;    <span class="cm">// onaylı, kalıcı piksel durumu</span>
+<span class="kw">private</span> <span class="tp">BufferedImage</span> overlayBuffer; <span class="cm">// şekil çizilirken geçici görüntü</span>
+
+<span class="kw">protected void</span> <span class="nm">paintComponent</span>(<span class="tp">Graphics</span> g) {
+    g.drawImage(backBuffer, <span class="cn">0</span>, <span class="cn">0</span>, <span class="kw">null</span>);    <span class="cm">// kalıcı katman</span>
+    g.drawImage(overlayBuffer, <span class="cn">0</span>, <span class="cn">0</span>, <span class="kw">null</span>); <span class="cm">// geçici katman (şeffaf zemin)</span>
+    <span class="kw">if</span> (selectionRect != <span class="kw">null</span>) {              <span class="cm">// seçim kutusu</span>
+        g.setColor(<span class="kw">new</span> <span class="tp">Color</span>(<span class="cn">0</span>, <span class="cn">120</span>, <span class="cn">215</span>, <span class="cn">100</span>));
+        g.fillRect(selectionRect.x, selectionRect.y, ...);
+    }
+}
+</pre>
+
+  <h3>Araç Mantığı — Kalem vs Şekil</h3>
+<pre>
+<span class="kw">private void</span> <span class="nm">onDragged</span>(<span class="tp">MouseEvent</span> e) {
+    <span class="kw">switch</span> (currentTool) {
+        <span class="kw">case</span> TOOL_PENCIL:
+        <span class="kw">case</span> TOOL_ERASER:
+            <span class="cm">// Her sürükleme segmenti anında backBuffer'a çizilir</span>
+            <span class="cm">// ve sunucuya DRAW_EVENT gönderilir (lastX,lastY → cx,cy)</span>
+            Graphics2D bg = backBuffer.createGraphics();
+            bg.drawLine(lastX, lastY, cx, cy);
+            onDrawFinished.accept(<span class="kw">new</span> <span class="tp">DrawEvent</span>(..., lastX, lastY, cx, cy));
+            <span class="kw">break</span>;
+
+        <span class="kw">case</span> TOOL_LINE:
+        <span class="kw">case</span> TOOL_RECT:
+        <span class="kw">case</span> TOOL_ELLIPSE:
+            <span class="cm">// Şekil tamamlanana kadar overlayBuffer'da gösterilir</span>
+            <span class="cm">// Mouse release'de backBuffer'a merge edilir, bir kez DRAW_EVENT gönderilir</span>
+            clearOverlay();
+            Graphics2D g = overlayBuffer.createGraphics();
+            g.drawRect(rx, ry, w, h); <span class="cm">// örnek: dikdörtgen</span>
+            <span class="kw">break</span>;
+    }
+}
+</pre>
+
+  <h3>Undo Stack</h3>
+<pre>
+<span class="kw">private final</span> <span class="tp">Deque</span>&lt;<span class="tp">BufferedImage</span>&gt; undoStack = <span class="kw">new</span> <span class="tp">ArrayDeque</span>&lt;&gt;();
+<span class="kw">private static final int</span> MAX_UNDO = <span class="cn">20</span>;
+
+<span class="kw">private void</span> <span class="nm">pushUndo</span>() { <span class="cm">// her mouse basışında çağrılır</span>
+    <span class="tp">BufferedImage</span> copy = <span class="kw">new</span> <span class="tp">BufferedImage</span>(canvasWidth, canvasHeight, TYPE_INT_ARGB);
+    copy.createGraphics().drawImage(backBuffer, <span class="cn">0</span>, <span class="cn">0</span>, <span class="kw">null</span>); <span class="cm">// derin kopya</span>
+    undoStack.push(copy);
+    <span class="kw">if</span> (undoStack.size() &gt; MAX_UNDO) undoStack.pollLast(); <span class="cm">// en eski → sil</span>
+}
+
+<span class="kw">public void</span> <span class="nm">undo</span>() {
+    <span class="kw">if</span> (undoStack.isEmpty()) <span class="kw">return</span>;
+    backBuffer = undoStack.pop(); <span class="cm">// önceki durumu geri yükle</span>
+    repaint();
+}
+</pre>
+
+  <h3>BFS Flood Fill</h3>
+<pre>
+<span class="kw">private void</span> <span class="nm">floodFill</span>(<span class="kw">int</span> x, <span class="kw">int</span> y, <span class="tp">Color</span> fillColor) {
+    <span class="kw">int</span> targetArgb = backBuffer.getRGB(x, y); <span class="cm">// tıklanan noktanın rengi</span>
+    <span class="kw">int</span> fillArgb   = fillColor.getRGB();
+    <span class="kw">if</span> (targetArgb == fillArgb) <span class="kw">return</span>; <span class="cm">// zaten aynı renk</span>
+
+    <span class="tp">Queue</span>&lt;<span class="tp">Point</span>&gt; queue = <span class="kw">new</span> <span class="tp">ArrayDeque</span>&lt;&gt;();
+    queue.add(<span class="kw">new</span> <span class="tp">Point</span>(x, y));
+
+    <span class="kw">while</span> (!queue.isEmpty()) {
+        <span class="tp">Point</span> p = queue.poll();
+        <span class="kw">if</span> (p.x &lt; <span class="cn">0</span> || p.x &gt;= canvasWidth || p.y &lt; <span class="cn">0</span> || p.y &gt;= canvasHeight) <span class="kw">continue</span>;
+        <span class="kw">if</span> (backBuffer.getRGB(p.x, p.y) != targetArgb) <span class="kw">continue</span>; <span class="cm">// farklı renk</span>
+        backBuffer.setRGB(p.x, p.y, fillArgb);  <span class="cm">// boyala</span>
+        <span class="cm">// 4 komşuyu kuyruğa ekle (sağ, sol, aşağı, yukarı)</span>
+        queue.add(<span class="kw">new</span> <span class="tp">Point</span>(p.x+<span class="cn">1</span>, p.y)); queue.add(<span class="kw">new</span> <span class="tp">Point</span>(p.x-<span class="cn">1</span>, p.y));
+        queue.add(<span class="kw">new</span> <span class="tp">Point</span>(p.x, p.y+<span class="cn">1</span>)); queue.add(<span class="kw">new</span> <span class="tp">Point</span>(p.x, p.y-<span class="cn">1</span>));
+    }
+}
+</pre>
+</div>
+
+<!-- MainFrame -->
+<div class="class-card" id="MainFrame">
+  <div class="class-header">
+    <div class="class-icon">G</div>
+    <div class="class-title">
+      <h2>MainFrame</h2>
+      <div class="subtitle"><span class="tag client">client</span> &nbsp; Ana pencere: tab sistemi, klavye kısayolları, tüm sunucu mesajlarını karşılayan onMessage()</div>
+    </div>
+  </div>
+
+  <h3>Klavye Kısayol Sistemi</h3>
+<pre>
+<span class="cm">// getRootPane().getInputMap() → pencere odakta olduğu sürece çalışır</span>
+<span class="tp">InputMap</span>  im = getRootPane().getInputMap(<span class="tp">WHEN_IN_FOCUSED_WINDOW</span>);
+<span class="tp">ActionMap</span> am = getRootPane().getActionMap();
+
+<span class="nm">bindKey</span>(im, am, <span class="tp">KeyEvent</span>.VK_Z, <span class="st">"undo"</span>, e -&gt; {
+    <span class="tp">CanvasPanel</span> c = activeCanvas();
+    <span class="kw">if</span> (c == <span class="kw">null</span>) <span class="kw">return</span>;
+    c.undo();
+    <span class="cm">// Diğer kullanıcıları da senkronize et: geri alınmış canvas'ı gönder</span>
+    <span class="kw">if</span> (fileId != <span class="kw">null</span> &amp;&amp; connection.isConnected())
+        connection.sendCanvasSnapshotData(fileId,
+            c.getCanvasWidth(), c.getCanvasHeight(), c.toPixelBytes());
+});
+
+<span class="cm">// Text kutusuna yazarken kısayolların tetiklenmemesi için kontrol</span>
+<span class="kw">private void</span> <span class="nm">bindKey</span>(<span class="tp">InputMap</span> im, <span class="tp">ActionMap</span> am, <span class="kw">int</span> keyCode, <span class="tp">String</span> name,
+                       <span class="tp">Consumer</span>&lt;<span class="tp">ActionEvent</span>&gt; handler) {
+    im.put(<span class="tp">KeyStroke</span>.getKeyStroke(keyCode, <span class="cn">0</span>), name);
+    am.put(name, <span class="kw">new</span> <span class="tp">AbstractAction</span>() {
+        <span class="kw">public void</span> <span class="nm">actionPerformed</span>(<span class="tp">ActionEvent</span> e) {
+            <span class="tp">Component</span> focused = <span class="tp">KeyboardFocusManager</span>
+                .getCurrentKeyboardFocusManager().getFocusOwner();
+            <span class="kw">if</span> (focused <span class="kw">instanceof</span> <span class="tp">JTextComponent</span>) <span class="kw">return</span>; <span class="cm">// text'teyse yok say</span>
+            handler.accept(e);
+        }
+    });
+}
+</pre>
+
+  <h3>Mesaj İşleme — onMessage()</h3>
+<pre>
+<span class="cm">// NetworkReader bu metodu EDT üzerinde çağırır</span>
+<span class="kw">private void</span> <span class="nm">onMessage</span>(<span class="tp">Message</span> msg) {
+    <span class="kw">switch</span> (msg.getType()) {
+        <span class="kw">case</span> LOGIN_OK:
+            <span class="tp">LoginOkPayload</span> ok = decodeLoginOk(msg.getPayload());
+            connection.onLoginOk(ok.sessionId); <span class="cm">// durum CONNECTED'e geçer</span>
+            connection.sendFileListReq();
+            <span class="kw">break</span>;
+
+        <span class="kw">case</span> FILE_OPEN_DATA:
+            <span class="tp">FileOpenDataPayload</span> data = decodeFileOpenData(msg.getPayload());
+            <span class="tp">CanvasPanel</span> canvas = <span class="kw">new</span> <span class="tp">CanvasPanel</span>(data.width, data.height);
+            canvas.fromPixelBytes(data.pixelData, data.width, data.height);
+            addFileTab(data.fileId, data.filename, canvas); <span class="cm">// yeni sekme</span>
+            <span class="kw">break</span>;
+
+        <span class="kw">case</span> DRAW_BROADCAST:
+            <span class="tp">DrawBroadcastPayload</span> draw = decodeDrawBroadcast(msg.getPayload());
+            <span class="tp">CanvasPanel</span> c = openCanvases.get(draw.fileId);
+            <span class="kw">if</span> (c != <span class="kw">null</span>) c.applyDrawCommand(draw); <span class="cm">// karşı tarafın çizimini uygula</span>
+            <span class="kw">break</span>;
+
+        <span class="kw">case</span> CANVAS_SNAPSHOT_REQ:
+            <span class="cm">// Sunucu canlı canvas istedi (yeni kullanıcı bağlandı)</span>
+            <span class="kw">int</span> reqFileId = decodeCanvasSnapshotReq(msg.getPayload());
+            <span class="tp">CanvasPanel</span> sc = openCanvases.get(reqFileId);
+            <span class="kw">if</span> (sc != <span class="kw">null</span>)
+                connection.sendCanvasSnapshotData(reqFileId,
+                    sc.getCanvasWidth(), sc.getCanvasHeight(), sc.toPixelBytes());
+            <span class="kw">break</span>;
+
+        <span class="kw">case</span> CANVAS_UPDATE:
+            <span class="cm">// Başka kullanıcı undo yaptı → canvas'ı güncelle</span>
+            <span class="tp">CanvasUpdatePayload</span> upd = decodeCanvasUpdate(msg.getPayload());
+            <span class="tp">CanvasPanel</span> uc = openCanvases.get(upd.fileId);
+            <span class="kw">if</span> (uc != <span class="kw">null</span>) uc.fromPixelBytes(upd.pixelData, upd.width, upd.height);
+            <span class="kw">break</span>;
+
+        <span class="kw">case</span> CLIPBOARD_DATA:
+            <span class="cm">// Yapıştırma verisi geldi — belirtilen koordinata uygula</span>
+            <span class="tp">ClipboardDataPayload</span> cp = decodeClipboardData(msg.getPayload());
+            <span class="tp">CanvasPanel</span> pc = openCanvases.get(cp.fileId);
+            <span class="kw">if</span> (pc != <span class="kw">null</span>) {
+                <span class="tp">BufferedImage</span> img = pixelBytesToImage(cp.pixelData, cp.width, cp.height);
+                pc.pasteImage(img, cp.x, cp.y);
+            }
+            <span class="kw">break</span>;
+    }
+}
+</pre>
+
+  <div class="ok"><strong>openCanvases: Map&lt;Integer, CanvasPanel&gt;</strong> — fileId ile canvas eşlemesi, her mesajda doğru canvas'ı bulmak için kullanılır. Kullanıcı aynı anda birden fazla dosya açabilir; her biri ayrı sekme ve ayrı CanvasPanel'dir.</div>
+</div>
+
+<div class="divider"></div>
+<p style="text-align:center; color:#888; font-size:9.5pt; margin-top:20px;">
+  MultiUserPaint — Bilgisayar Ağları Projesi &nbsp;|&nbsp; Tüm sınıfların anlatımı
+</p>
+</main>
+</body>
+</html>

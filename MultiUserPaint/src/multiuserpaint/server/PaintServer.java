@@ -44,7 +44,7 @@ public class PaintServer {
         LoginHandler     loginHandler     = new LoginHandler(registry);
         FileHandler      fileHandler      = new FileHandler(fileStore, registry, diskPool);
         DrawHandler      drawHandler      = new DrawHandler(registry);
-        ClipboardHandler clipboardHandler = new ClipboardHandler();
+        ClipboardHandler clipboardHandler = new ClipboardHandler(registry);
 
         MessageDispatcher dispatcher = new MessageDispatcher(
             loginHandler, fileHandler, drawHandler, clipboardHandler);

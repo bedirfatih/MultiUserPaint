@@ -91,6 +91,11 @@ public class MessageDispatcher {
                 drawHandler.handle(session, msg);
                 break;
 
+            // Canvas snapshot: sent by client either to serve a new joiner or to broadcast undo
+            case CANVAS_SNAPSHOT_DATA:
+                fileHandler.handleSnapshotData(session, msg);
+                break;
+
             // Clipboard
             case CLIPBOARD_COPY:
             case CLIPBOARD_CUT:

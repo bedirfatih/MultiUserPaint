@@ -143,10 +143,18 @@ public class MessageDecoder {
         }
     }
 
+    public static class ClipboardPasteReqPayload {
+        public final int fileId, x, y;
+        public ClipboardPasteReqPayload(int fileId, int x, int y) {
+            this.fileId = fileId; this.x = x; this.y = y;
+        }
+    }
+
     public static class ClipboardDataPayload {
-        public final int width, height;
+        public final int fileId, x, y, width, height;
         public final byte[] pixelData;
-        public ClipboardDataPayload(int width, int height, byte[] pixelData) {
+        public ClipboardDataPayload(int fileId, int x, int y, int width, int height, byte[] pixelData) {
+            this.fileId = fileId; this.x = x; this.y = y;
             this.width = width; this.height = height; this.pixelData = pixelData;
         }
     }
@@ -156,6 +164,22 @@ public class MessageDecoder {
         public final long timestamp;
         public UserEventPayload(String username, long timestamp) {
             this.username = username; this.timestamp = timestamp;
+        }
+    }
+
+    public static class CanvasUpdatePayload {
+        public final int fileId, width, height;
+        public final byte[] pixelData;
+        public CanvasUpdatePayload(int fileId, int width, int height, byte[] pixelData) {
+            this.fileId = fileId; this.width = width; this.height = height; this.pixelData = pixelData;
+        }
+    }
+
+    public static class CanvasSnapshotDataPayload {
+        public final int fileId, width, height;
+        public final byte[] pixelData;
+        public CanvasSnapshotDataPayload(int fileId, int width, int height, byte[] pixelData) {
+            this.fileId = fileId; this.width = width; this.height = height; this.pixelData = pixelData;
         }
     }
 
@@ -275,13 +299,19 @@ public class MessageDecoder {
         return new ClipboardRegionPayload(fileId, rx, ry, rw, rh, data);
     }
 
+    public static ClipboardPasteReqPayload decodeClipboardPasteReq(byte[] p) throws IOException {
+        DataInputStream in = wrap(p);
+        return new ClipboardPasteReqPayload(in.readInt(), in.readInt(), in.readInt());
+    }
+
     public static ClipboardDataPayload decodeClipboardData(byte[] p) throws IOException {
         DataInputStream in = wrap(p);
+        int fileId = in.readInt(), x = in.readInt(), y = in.readInt();
         int w = in.readInt(), h = in.readInt();
         int len = in.readInt();
         byte[] data = new byte[len];
         in.readFully(data);
-        return new ClipboardDataPayload(w, h, data);
+        return new ClipboardDataPayload(fileId, x, y, w, h, data);
     }
 
     public static UserEventPayload decodeUserEvent(byte[] p) throws IOException {
@@ -300,6 +330,30 @@ public class MessageDecoder {
     public static AutosaveNotifyPayload decodeAutosaveNotify(byte[] p) throws IOException {
         DataInputStream in = wrap(p);
         return new AutosaveNotifyPayload(in.readInt(), in.readLong());
+    }
+
+    public static CanvasUpdatePayload decodeCanvasUpdate(byte[] p) throws IOException {
+        DataInputStream in = wrap(p);
+        int fileId = in.readInt(), width = in.readInt(), height = in.readInt();
+        int len = in.readInt();
+        byte[] data = new byte[len];
+        in.readFully(data);
+        return new CanvasUpdatePayload(fileId, width, height, data);
+    }
+
+    public static int decodeCanvasSnapshotReq(byte[] p) throws IOException {
+        return wrap(p).readInt();
+    }
+
+    public static CanvasSnapshotDataPayload decodeCanvasSnapshotData(byte[] p) throws IOException {
+        DataInputStream in = wrap(p);
+        int fileId = in.readInt();
+        int width  = in.readInt();
+        int height = in.readInt();
+        int len    = in.readInt();
+        byte[] data = new byte[len];
+        in.readFully(data);
+        return new CanvasSnapshotDataPayload(fileId, width, height, data);
     }
 
     public static String decodeError(byte[] p) throws IOException {

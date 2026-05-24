@@ -125,8 +125,17 @@
   <li><a href="#s4">Mesaj Payload Şemaları</a></li>
   <li><a href="#s5">Sunucu Sonlu Durum Makinası (FSM)</a></li>
   <li><a href="#s6">İstemci Sonlu Durum Makinası (FSM)</a></li>
-  <li><a href="#s7">Senaryo Diyagramları</a></li>
-  <li><a href="#s8">Hata Kodları</a></li>
+  <li><a href="#s7">Senaryo Diyagramları</a>
+    <ol style="margin-top:4px; margin-left:20px">
+      <li><a href="#s71">Kullanıcı Giriş Senaryosu</a></li>
+      <li><a href="#s72">Eş Zamanlı Çizim Senaryosu</a></li>
+      <li><a href="#s73">Otomatik Kayıt Senaryosu</a></li>
+      <li><a href="#s74">Pano (Kopyala / Yapıştır) Senaryosu</a></li>
+      <li><a href="#s75">Eş Zamanlı Erişim — Canvas Senkronizasyonu</a></li>
+      <li><a href="#s76">Geri Al (Undo) Senkronizasyonu</a></li>
+    </ol>
+  </li>
+  <li><a href="#s8">Hata Kodları ve Hata Yönetimi</a></li>
 </ol>
 
 <!-- ======================================================== 1 -->
@@ -228,14 +237,17 @@ Payload içindeki her metin değeri aşağıdaki şema ile kodlanır. Bu kural t
   <tr><td>0x20</td><td>DRAW_EVENT</td><td><span class="tag cs">C→S</span></td><td>Tek bir çizim komutu (araç tipi, renk, koordinatlar). Her mouse hareketi veya şekil tamamlandığında gönderilir.</td><td>İlgili dosya açık ve kullanıcı ACTIVE durumunda olmalı.</td></tr>
   <tr><td>0x21</td><td>DRAW_BROADCAST</td><td><span class="tag sc">S→C</span></td><td>Sunucunun, bir istemciden aldığı çizim komutunu aynı dosyayı açık olan diğer istemcilere iletmesi.</td><td>En az bir başka istemci aynı dosyayı açmış olmalı.</td></tr>
   <tr><td>0x30</td><td>CLIPBOARD_COPY</td><td><span class="tag cs">C→S</span></td><td>Seçilen bölgenin piksel verisi sunucuya gönderilir ve oturuma ait panoya kaydedilir.</td><td>Kullanıcı bir bölge seçmiş ve ilgili dosyayı açmış olmalı.</td></tr>
-  <tr><td>0x31</td><td>CLIPBOARD_PASTE_REQ</td><td><span class="tag cs">C→S</span></td><td>Kullanıcının sunucudaki panosundaki veriyi talep etmesi.</td><td>Daha önce CLIPBOARD_COPY veya CLIPBOARD_CUT gönderilmiş olmalı.</td></tr>
-  <tr><td>0x32</td><td>CLIPBOARD_DATA</td><td><span class="tag sc">S→C</span></td><td>Pano içeriğindeki piksel verisi istemciye gönderilir.</td><td>Geçerli CLIPBOARD_PASTE_REQ alınmış ve pano dolu olmalı.</td></tr>
+  <tr><td>0x31</td><td>CLIPBOARD_PASTE_REQ</td><td><span class="tag cs">C→S</span></td><td>Pano verisini yapıştırma isteği. Hedef dosya kimliği ve yapıştırma koordinatları (x, y) gönderilir. Sunucu, pano verisini hem isteği gönderen istemciye hem de aynı dosyayı açık olan diğer istemcilere iletir.</td><td>Daha önce CLIPBOARD_COPY veya CLIPBOARD_CUT gönderilmiş olmalı. Dosya açık olmalı.</td></tr>
+  <tr><td>0x32</td><td>CLIPBOARD_DATA</td><td><span class="tag sc">S→C</span></td><td>Pano içeriğindeki piksel verisi; hedef dosya kimliği ve yapıştırma konumuyla birlikte istemciye iletilir. Hem yapıştırma isteğini gönderen istemciye hem de aynı dosyayı açık diğer istemcilere broadcast edilir.</td><td>Geçerli CLIPBOARD_PASTE_REQ alınmış ve pano dolu olmalı.</td></tr>
   <tr><td>0x33</td><td>CLIPBOARD_CUT</td><td><span class="tag cs">C→S</span></td><td>Seçilen bölgenin piksel verisi panoya kaydedilmek üzere sunucuya gönderilir. Bölgenin silinmesi istemci tarafında gerçekleşir.</td><td>Kullanıcı bir bölge seçmiş olmalı.</td></tr>
   <tr><td>0x40</td><td>USER_JOIN</td><td><span class="tag sc">S→C</span></td><td>Yeni bir kullanıcı sisteme bağlandığında tüm aktif istemcilere yayınlanır.</td><td>Yeni kullanıcının LOGIN_OK alması.</td></tr>
   <tr><td>0x41</td><td>USER_LEAVE</td><td><span class="tag sc">S→C</span></td><td>Bir kullanıcı ayrıldığında tüm aktif istemcilere yayınlanır.</td><td>Kullanıcının TCP bağlantısının kapanması.</td></tr>
   <tr><td>0x42</td><td>USER_LIST_REQ</td><td><span class="tag cs">C→S</span></td><td>Şu an bağlı olan tüm kullanıcıların listesini isteme.</td><td>Kullanıcı ACTIVE durumunda olmalı.</td></tr>
   <tr><td>0x43</td><td>USER_LIST_RESP</td><td><span class="tag sc">S→C</span></td><td>Aktif kullanıcı adlarının listesi gönderilir.</td><td>Geçerli USER_LIST_REQ alınmış olmalı.</td></tr>
   <tr><td>0x50</td><td>AUTOSAVE_NOTIFY</td><td><span class="tag sc">S→C</span></td><td>Sunucunun periyodik otomatik kayıt yaptığını ilgili istemcilere bildirmesi.</td><td>Otomatik kayıt zamanlayıcısı tetiklenmiş olmalı.</td></tr>
+  <tr><td>0x60</td><td>CANVAS_SNAPSHOT_REQ</td><td><span class="tag sc">S→C</span></td><td>Sunucunun, aktif çalışan bir istemciden anlık canvas piksel verisini istemesi. Yeni bir kullanıcı aynı dosyayı açtığında tetiklenir.</td><td>Dosyayı açık başka en az bir aktif istemci mevcut olmalı.</td></tr>
+  <tr><td>0x61</td><td>CANVAS_SNAPSHOT_DATA</td><td><span class="tag cs">C→S</span></td><td>İstemcinin sunucuya anlık canvas piksel verisini göndermesi. İki durumda kullanılır: (1) Sunucunun CANVAS_SNAPSHOT_REQ talebi üzerine, (2) Geri al (Undo) işleminden sonra diğer kullanıcıları senkronize etmek için istemci tarafından proaktif olarak gönderilir.</td><td>Sunucudan CANVAS_SNAPSHOT_REQ alınmış olmalı VEYA istemci geri al işlemi gerçekleştirmiş olmalı.</td></tr>
+  <tr><td>0x62</td><td>CANVAS_UPDATE</td><td><span class="tag sc">S→C</span></td><td>Sunucunun, bir istemciden aldığı güncel canvas piksel verisini aynı dosyayı açık olan diğer tüm istemcilere iletmesi. Geri al (Undo) işlemi ve diğer tam-canvas güncelleme olaylarında tetiklenir.</td><td>Sunucunun bir istemciden CANVAS_SNAPSHOT_DATA alması ve dosyayı açık başka istemcilerin bulunması.</td></tr>
   <tr><td>0xF0</td><td>PING</td><td><span class="tag cs">C→S</span></td><td>Bağlantının canlı olduğunu doğrulamak için gönderilen canlılık sinyali.</td><td>Kullanıcı ACTIVE durumunda olmalı.</td></tr>
   <tr><td>0xF1</td><td>PONG</td><td><span class="tag sc">S→C</span></td><td>PING mesajına yanıt.</td><td>PING alınmış olmalı.</td></tr>
   <tr><td>0xFF</td><td>ERROR</td><td><span class="tag sc">S→C</span></td><td>Genel hata bildirimi. İnsan tarafından okunabilir açıklama içerir.</td><td>Herhangi bir işlem hatası.</td></tr>
@@ -336,11 +348,23 @@ Payload içindeki her metin değeri aşağıdaki şema ile kodlanır. Bu kural t
   rx, ry: Seçim bölgesinin sol üst köşesi (piksel)
   rw, rh: Seçim genişliği ve yüksekliği (piksel)</div>
 
+<h3>CLIPBOARD_PASTE_REQ (0x31)</h3>
+<div class="frame">  ┌──────────┬────────────────┬────────────────┐
+  │ dosya_id │ yapistirma_x   │ yapistirma_y   │
+  │ int (4B) │ int (4B)       │ int (4B)       │
+  └──────────┴────────────────┴────────────────┘
+  dosya_id      : Panonun yapıştırılacağı hedef dosya kimliği
+  yapistirma_x  : Yapıştırma bölgesinin sol üst köşesi — X (piksel)
+  yapistirma_y  : Yapıştırma bölgesinin sol üst köşesi — Y (piksel)</div>
+
 <h3>CLIPBOARD_DATA (0x32)</h3>
-<div class="frame">  ┌──────────┬──────────┬────────────────┬─────────────────────┐
-  │ genislik │ yukseklik│ veri_uzunlugu  │ piksel_verisi       │
-  │ int (4B) │ int (4B) │ int (4B)       │ veri_uzunlugu bayt  │
-  └──────────┴──────────┴────────────────┴─────────────────────┘</div>
+<div class="frame">  ┌──────────┬──────────────┬──────────────┬──────────┬──────────┬────────────────┬─────────────────────┐
+  │ dosya_id │ yapistirma_x │ yapistirma_y │ genislik │ yukseklik│ veri_uzunlugu  │ piksel_verisi       │
+  │ int (4B) │ int (4B)     │ int (4B)     │ int (4B) │ int (4B) │ int (4B)       │ veri_uzunlugu bayt  │
+  └──────────┴──────────────┴──────────────┴──────────┴──────────┴────────────────┴─────────────────────┘
+  dosya_id      : Panonun yapıştırıldığı hedef dosya kimliği
+  yapistirma_x/y: Yapıştırma bölgesinin sol üst köşesi (CLIPBOARD_PASTE_REQ'dan alınır)
+  piksel_verisi : Ham ARGB formatında pano piksel dizisi; Her piksel 4 bayttır: [A][R][G][B]</div>
 
 <h3>USER_JOIN / USER_LEAVE (0x40, 0x41)</h3>
 <div class="frame">  ┌──────────────────────┬──────────────────────────────────────┐
@@ -353,12 +377,39 @@ Payload içindeki her metin değeri aşağıdaki şema ile kodlanır. Bu kural t
   │ int (4B) │                                      │
   └──────────┴──────────────────────────────────────┘</div>
 
+<h3>CANVAS_SNAPSHOT_REQ (0x60)</h3>
+<div class="frame">  ┌────────────────────┐
+  │  dosya_id (int)    │
+  │  4 bayt            │
+  └────────────────────┘
+  Sunucu tarafından aktif bir istemciye gönderilir.
+  İstemciden o anki canvas piksel verisini göndermesi beklenir.</div>
+
+<h3>CANVAS_SNAPSHOT_DATA (0x61)</h3>
+<div class="frame">  ┌──────────┬──────────┬──────────┬────────────────┬─────────────────────┐
+  │ dosya_id │ genislik │ yukseklik│ veri_uzunlugu  │ piksel_verisi       │
+  │ int (4B) │ int (4B) │ int (4B) │ int (4B)       │ veri_uzunlugu bayt  │
+  └──────────┴──────────┴──────────┴────────────────┴─────────────────────┘
+  piksel_verisi: Ham ARGB formatında piksel dizisi.
+                 Her piksel 4 bayttır: [A][R][G][B]
+                 Toplam boyut = genislik × yukseklik × 4 bayt</div>
+
 <h3>ERROR (0xFF)</h3>
 <div class="frame">  ┌──────────────────────────────────────────────────┐
   │  hata_mesaji : STRING                            │
   └──────────────────────────────────────────────────┘</div>
 
-<h3>PING (0xF0), PONG (0xF1), FILE_SAVE_OK (0x17), FILE_DELETE_OK (0x19), CLIPBOARD_PASTE_REQ (0x31), USER_LIST_REQ (0x42), FILE_LIST_REQ (0x14), FILE_OPEN_REQ (0x12)</h3>
+<h3>CANVAS_UPDATE (0x62)</h3>
+<div class="frame">  ┌──────────┬──────────┬──────────┬────────────────┬─────────────────────┐
+  │ dosya_id │ genislik │ yukseklik│ veri_uzunlugu  │ piksel_verisi       │
+  │ int (4B) │ int (4B) │ int (4B) │ int (4B)       │ veri_uzunlugu bayt  │
+  └──────────┴──────────┴──────────┴────────────────┴─────────────────────┘
+  piksel_verisi: Ham ARGB formatında piksel dizisi.
+                 Her piksel 4 bayttır: [A][R][G][B]
+                 Toplam boyut = genislik × yukseklik × 4 bayt
+  Not: Bu mesaj CANVAS_SNAPSHOT_DATA ile aynı yapıya sahiptir; fakat yönü ters yöndedir (S→C).</div>
+
+<h3>PING (0xF0), PONG (0xF1), FILE_SAVE_OK (0x17), FILE_DELETE_OK (0x19), USER_LIST_REQ (0x42), FILE_LIST_REQ (0x14)</h3>
 <p>Bu mesajlar için ya payload boştur (PAY_LEN = 0) ya da yalnızca dosya_id içerir (4 bayt int).</p>
 
 <!-- ======================================================== 5 -->
@@ -498,6 +549,18 @@ Sunucu, her TCP bağlantısı için bağımsız bir FSM örneği çalıştırır
   </tr>
   <tr>
     <td>ACTIVE</td>
+    <td>FILE_OPEN_REQ alındı, dosya mevcut ve başka aktif görüntüleyici var</td>
+    <td>ACTIVE</td>
+    <td>Aktif görüntüleyicilerden birine CANVAS_SNAPSHOT_REQ gönder; isteği bekleyenler listesine ekle</td>
+  </tr>
+  <tr>
+    <td>ACTIVE</td>
+    <td>CANVAS_SNAPSHOT_DATA alındı</td>
+    <td>ACTIVE</td>
+    <td>Bekleyen tüm yeni istemcilere gelen piksel verisiyle FILE_OPEN_DATA gönder; aynı dosyayı açık olan diğer tüm istemcilere CANVAS_UPDATE yayınla (gönderen hariç)</td>
+  </tr>
+  <tr>
+    <td>ACTIVE</td>
     <td>CLIPBOARD_COPY veya CLIPBOARD_CUT alındı</td>
     <td>ACTIVE</td>
     <td>Piksel verisini oturuma ait panoya kaydet</td>
@@ -506,7 +569,7 @@ Sunucu, her TCP bağlantısı için bağımsız bir FSM örneği çalıştırır
     <td>ACTIVE</td>
     <td>CLIPBOARD_PASTE_REQ alındı, pano dolu</td>
     <td>ACTIVE</td>
-    <td>CLIPBOARD_DATA gönder</td>
+    <td>CLIPBOARD_DATA'yı (dosya_id + yapıştırma koordinatları + piksel verisi) hem isteği gönderen istemciye gönder hem de aynı dosyayı açık olan diğer tüm istemcilere yayınla</td>
   </tr>
   <tr>
     <td>ACTIVE</td>
@@ -636,6 +699,36 @@ Sunucu, her TCP bağlantısı için bağımsız bir FSM örneği çalıştırır
   </tr>
   <tr>
     <td>CONNECTED</td>
+    <td>CANVAS_SNAPSHOT_REQ alındı</td>
+    <td>CONNECTED</td>
+    <td>Aktif tuvalin piksel verisini al; CANVAS_SNAPSHOT_DATA gönder</td>
+  </tr>
+  <tr>
+    <td>CONNECTED</td>
+    <td>CANVAS_UPDATE alındı</td>
+    <td>CONNECTED</td>
+    <td>Gelen piksel verisini ilgili tuvale uygula (dosya_id ile eşleştir); ekranı yenile</td>
+  </tr>
+  <tr>
+    <td>CONNECTED</td>
+    <td>Kullanıcı Geri Al (Undo) yaptı (Z tuşu)</td>
+    <td>CONNECTED</td>
+    <td>Yerel undo yığından önceki canvas durumunu geri yükle; CANVAS_SNAPSHOT_DATA gönder (diğer istemcileri senkronize et)</td>
+  </tr>
+  <tr>
+    <td>CONNECTED</td>
+    <td>Kullanıcı Yapıştır yaptı (V tuşu)</td>
+    <td>CONNECTED</td>
+    <td>Fare konumunu al; CLIPBOARD_PASTE_REQ gönder (dosya_id + yapıştırma koordinatları)</td>
+  </tr>
+  <tr>
+    <td>CONNECTED</td>
+    <td>CLIPBOARD_DATA alındı</td>
+    <td>CONNECTED</td>
+    <td>Gelen piksel verisini ilgili tuvalin belirtilen (x, y) konumuna uygula; ekranı yenile</td>
+  </tr>
+  <tr>
+    <td>CONNECTED</td>
     <td>IOException (okuma veya yazma hatası)</td>
     <td>DISCONNECTED</td>
     <td>Kullanıcıya bağlantı kesildi uyarısı göster; arayüzü devre dışı bırak</td>
@@ -651,7 +744,7 @@ Sunucu, her TCP bağlantısı için bağımsız bir FSM örneği çalıştırır
 <!-- ======================================================== 7 -->
 <h2 id="s7">7. Senaryo Diyagramları</h2>
 
-<h3>7.1 Kullanıcı Giriş Senaryosu</h3>
+<h3 id="s71">7.1 Kullanıcı Giriş Senaryosu</h3>
 <div class="seq">  İstemci A                                Sunucu
      │                                        │
      │──── TCP SYN ──────────────────────────►│  TCP bağlantısı kurulur
@@ -668,7 +761,7 @@ Sunucu, her TCP bağlantısı için bağımsız bir FSM örneği çalıştırır
      │──── FILE_LIST_REQ ────────────────────►│
      │◄─── FILE_LIST_RESP([...]) ─────────────│</div>
 
-<h3>7.2 Eş Zamanlı Çizim Senaryosu</h3>
+<h3 id="s72">7.2 Eş Zamanlı Çizim Senaryosu</h3>
 <div class="seq">  İstemci A              Sunucu              İstemci B
      │                      │                      │
      │  (her ikisi de dosya_id=5'i açmış durumda)  │
@@ -689,7 +782,7 @@ Sunucu, her TCP bağlantısı için bağımsız bir FSM örneği çalıştırır
      │  İstemci A tuvale    │                      │
      │  uygular             │                      │</div>
 
-<h3>7.3 Otomatik Kayıt Senaryosu</h3>
+<h3 id="s73">7.3 Otomatik Kayıt Senaryosu</h3>
 <div class="seq">  İstemci A              Sunucu              İstemci B
      │                      │                      │
      │             [60 saniye zamanlayıcısı tetiklendi]
@@ -704,27 +797,93 @@ Sunucu, her TCP bağlantısı için bağımsız bir FSM örneği çalıştırır
      │  "Otomatik kaydedildi"│                    "Otomatik kaydedildi"
      │  bilgisi gösterilir  │               bilgisi gösterilir</div>
 
-<h3>7.4 Pano (Kopyala / Yapıştır) Senaryosu</h3>
-<div class="seq">  İstemci A              Sunucu
-     │                      │
-     │  Kullanıcı bölge seçer ve "Kopyala" yapar
-     │                      │
-     │── CLIPBOARD_COPY ────►│  Piksel verisi oturuma ait
-     │   (dosya_id=5,        │  panoya kaydedilir
-     │    rx=50, ry=50,      │
-     │    rw=100, rh=80,     │
-     │    piksel_verisi)     │
-     │                      │
-     │  Kullanıcı "Yapıştır" yapar
-     │                      │
-     │── CLIPBOARD_PASTE_REQ►│  Pano verisi alınır
-     │                      │
-     │◄── CLIPBOARD_DATA ───│  Piksel verisi gönderilir
-     │    (genislik=100,     │
-     │     yukseklik=80,     │
-     │     piksel_verisi)    │
-     │                      │
-     │  Veri tuvale uygulanır│</div>
+<h3 id="s74">7.4 Pano (Kopyala / Yapıştır) Senaryosu</h3>
+<div class="seq">  İstemci A              Sunucu              İstemci B
+     │                      │                      │
+     │  (her ikisi de dosya_id=5'i açmış durumda)  │
+     │                      │                      │
+     │  Kullanıcı bölge seçer ve "Kopyala" yapar (C tuşu)
+     │                      │                      │
+     │── CLIPBOARD_COPY ────►│  Piksel verisi A'nın │
+     │   (dosya_id=5,        │  oturumuna ait       │
+     │    rx=50, ry=50,      │  panoya kaydedilir   │
+     │    rw=100, rh=80,     │                      │
+     │    piksel_verisi)     │                      │
+     │                      │                      │
+     │  Kullanıcı fare imlecini hedef konuma götürür ve "Yapıştır" yapar (V tuşu)
+     │                      │                      │
+     │── CLIPBOARD_PASTE_REQ►│  Pano verisi alınır  │
+     │   (dosya_id=5,        │                      │
+     │    x=200, y=150)      │  CLIPBOARD_DATA'yı   │
+     │                      │  hem A'ya hem B'ye   │
+     │◄── CLIPBOARD_DATA ───│  gönderilir          │
+     │    (dosya_id=5,       │── CLIPBOARD_DATA ───►│
+     │     x=200, y=150,     │   (dosya_id=5,       │
+     │     genislik=100,     │    x=200, y=150,     │
+     │     yukseklik=80,     │    genislik=100,     │
+     │     piksel_verisi)    │    yukseklik=80,     │
+     │                      │    piksel_verisi)    │
+     │  Veri tuvale          │                      │
+     │  (200,150) konumuna  │              Veri tuvale
+     │  uygulanır           │              (200,150) konumuna
+     │                      │              uygulanır</div>
+
+<h3 id="s75">7.5 Eş Zamanlı Erişim — Canvas Senkronizasyonu</h3>
+<div class="seq">  İstemci A (aktif)      Sunucu              İstemci B (yeni bağlanan)
+     │                      │                      │
+     │  (dosya_id=5 açık,   │                      │
+     │   üzerinde çalışıyor)│                      │── FILE_OPEN_REQ(5) ──►│
+     │                      │                      │
+     │                      │  Aktif görüntüleyici │
+     │                      │  var: İstemci A      │
+     │                      │  Bekleyenler: [B]    │
+     │                      │                      │
+     │◄── CANVAS_SNAPSHOT_REQ(dosya_id=5) ─────────│
+     │                      │                      │
+     │  Güncel canvas        │                      │
+     │  piksel verisi alınır │                      │
+     │                      │                      │
+     │── CANVAS_SNAPSHOT_DATA(5, w, h, piksel) ────►│
+     │                      │                      │
+     │                      │  Bekleyen B'ye        │
+     │                      │  ilet                │
+     │                      │                      │
+     │                      │── FILE_OPEN_DATA ────►│  İstemci B, A'nın
+     │                      │   (dosya_id=5,        │  güncel canvas'ını görür
+     │                      │    piksel_verisi)     │
+     │                      │                      │
+     │  A'nın çalışması     │                      │
+     │  kesintisiz devam    │                      │
+     │  eder                │                      │</div>
+
+<h3 id="s76">7.6 Geri Al (Undo) Senkronizasyonu</h3>
+<div class="seq">  İstemci A (geri al yapan)  Sunucu         İstemci B (diğer görüntüleyici)
+     │                           │                      │
+     │  (her ikisi de dosya_id=5'i açmış durumda)       │
+     │  (A, son çizim işlemini geri almak istiyor)       │
+     │                           │                      │
+     │  Kullanıcı Z tuşuna basar                        │
+     │                           │                      │
+     │  Yerel undo yığından       │                      │
+     │  önceki canvas durumu     │                      │
+     │  geri yüklenir            │                      │
+     │  (ekran anında güncellenir)│                     │
+     │                           │                      │
+     │── CANVAS_SNAPSHOT_DATA ──►│  Gönderen (A) hariç  │
+     │   (dosya_id=5,            │  aynı dosyayı açık   │
+     │    genislik=800,          │  istemcilere         │
+     │    yukseklik=600,         │  CANVAS_UPDATE ile   │
+     │    piksel_verisi)         │  iletilir            │
+     │                           │                      │
+     │                           │── CANVAS_UPDATE ────►│
+     │                           │   (dosya_id=5,       │
+     │                           │    genislik=800,     │
+     │                           │    yukseklik=600,    │
+     │                           │    piksel_verisi)    │
+     │                           │                      │
+     │  A geri al yaptı,         │              B'nin tuvali
+     │  A'nın ekranı güncel      │              de güncellendi;
+     │                           │              senkronize durumda</div>
 
 <!-- ======================================================== 8 -->
 <h2 id="s8">8. Hata Kodları ve Hata Yönetimi</h2>

@@ -118,8 +118,12 @@ public class ConnectionManager {
         send(MessageEncoder.encodeClipboardCut(fileId, rx, ry, rw, rh, pixelData));
     }
 
-    public void sendClipboardPasteReq() {
-        send(MessageEncoder.encodeClipboardPasteReq());
+    public void sendClipboardPasteReq(int fileId, int pasteX, int pasteY) {
+        send(MessageEncoder.encodeClipboardPasteReq(fileId, pasteX, pasteY));
+    }
+
+    public void sendCanvasSnapshotData(int fileId, int width, int height, byte[] pixelData) {
+        send(MessageEncoder.encodeCanvasSnapshotData(fileId, width, height, pixelData));
     }
 
     public void sendPing() {

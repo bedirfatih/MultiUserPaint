@@ -189,6 +189,30 @@ public class MessageEncoder {
     // Clipboard messages
     // -------------------------------------------------------------------------
 
+    public static byte[] encodeCanvasUpdate(int fileId, int width, int height, byte[] pixelData) {
+        return buildWith(out -> {
+            out.writeInt(fileId);
+            out.writeInt(width);
+            out.writeInt(height);
+            out.writeInt(pixelData.length);
+            out.write(pixelData);
+        }, MessageType.CANVAS_UPDATE);
+    }
+
+    public static byte[] encodeCanvasSnapshotReq(int fileId) {
+        return buildWith(out -> out.writeInt(fileId), MessageType.CANVAS_SNAPSHOT_REQ);
+    }
+
+    public static byte[] encodeCanvasSnapshotData(int fileId, int width, int height, byte[] pixelData) {
+        return buildWith(out -> {
+            out.writeInt(fileId);
+            out.writeInt(width);
+            out.writeInt(height);
+            out.writeInt(pixelData.length);
+            out.write(pixelData);
+        }, MessageType.CANVAS_SNAPSHOT_DATA);
+    }
+
     public static byte[] encodeClipboardCopy(int fileId, int rx, int ry, int rw, int rh, byte[] pixelData) {
         return encodeClipboardRegion(MessageType.CLIPBOARD_COPY, fileId, rx, ry, rw, rh, pixelData);
     }
@@ -210,12 +234,20 @@ public class MessageEncoder {
         }, t);
     }
 
-    public static byte[] encodeClipboardPasteReq() {
-        return encode(MessageType.CLIPBOARD_PASTE_REQ, null);
+    public static byte[] encodeClipboardPasteReq(int fileId, int pasteX, int pasteY) {
+        return buildWith(out -> {
+            out.writeInt(fileId);
+            out.writeInt(pasteX);
+            out.writeInt(pasteY);
+        }, MessageType.CLIPBOARD_PASTE_REQ);
     }
 
-    public static byte[] encodeClipboardData(int width, int height, byte[] pixelData) {
+    public static byte[] encodeClipboardData(int fileId, int pasteX, int pasteY,
+                                              int width, int height, byte[] pixelData) {
         return buildWith(out -> {
+            out.writeInt(fileId);
+            out.writeInt(pasteX);
+            out.writeInt(pasteY);
             out.writeInt(width);
             out.writeInt(height);
             out.writeInt(pixelData.length);

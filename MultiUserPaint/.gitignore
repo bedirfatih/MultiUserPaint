@@ -1,0 +1,21 @@
+# Derlenmiş class dosyaları
+build/
+dist/
+*.class
+
+# Çalışma zamanında oluşan canvas dosyaları
+files/
+
+# NetBeans proje önbelleği
+nbproject/private/
+nbbuild/
+nbdist/
+
+# IDE dosyaları
+.idea/
+*.iml
+.vscode/
+
+# OS
+Thumbs.db
+.DS_Store
