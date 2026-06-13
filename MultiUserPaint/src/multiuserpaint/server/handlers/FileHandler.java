@@ -7,7 +7,6 @@ import multiuserpaint.server.store.FileStore;
 import multiuserpaint.server.store.SessionRegistry;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -200,6 +199,6 @@ public class FileHandler {
     }
 
     private void enqueue(ClientSession session, byte[] data) {
-        session.writeQueue.offer(ByteBuffer.wrap(data));
+        session.enqueue(data);
     }
 }

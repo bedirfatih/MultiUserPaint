@@ -5,7 +5,6 @@ import multiuserpaint.server.ClientSession;
 import multiuserpaint.server.store.SessionRegistry;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.logging.Logger;
 
 /**
@@ -55,6 +54,6 @@ public class ClipboardHandler {
     }
 
     private void enqueue(ClientSession session, byte[] data) {
-        session.writeQueue.offer(ByteBuffer.wrap(data));
+        session.enqueue(data);
     }
 }

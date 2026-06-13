@@ -90,6 +90,7 @@
   .tag.client { background: #388e3c; color: #fff; }
   .tag.store  { background: #f57c00; color: #fff; }
   .tag.handler{ background: #c62828; color: #fff; }
+  .tag.mq     { background: #7b1fa2; color: #fff; }
   .divider { height: 2px; background: linear-gradient(90deg,#1a3c6e,#e8f0fe);
              margin: 40px 0; border-radius: 2px; }
   @media print { .sidebar { display: none; } main { margin-left: 0; } }
@@ -109,12 +110,19 @@
   <a href="#MessageEncoder">MessageEncoder</a>
   <a href="#MessageDecoder">MessageDecoder</a>
 
+  <h2>MQ Ortak</h2>
+  <a href="#MQConfig">MQConfig</a>
+
   <h2>Server Paketi</h2>
   <a href="#PaintServer">PaintServer</a>
   <a href="#NIOSelector">NIOSelector</a>
   <a href="#MessageFramer">MessageFramer</a>
   <a href="#MessageDispatcher">MessageDispatcher</a>
   <a href="#ClientSession">ClientSession</a>
+
+  <h2>Server — MQ</h2>
+  <a href="#MQBroker">MQBroker</a>
+  <a href="#MQServerTransport">MQServerTransport</a>
 
   <h2>Server — Store</h2>
   <a href="#SessionRegistry">SessionRegistry</a>
@@ -133,6 +141,8 @@
   <a href="#ConnectionManager">ConnectionManager</a>
   <a href="#NetworkReader">NetworkReader</a>
   <a href="#NetworkWriter">NetworkWriter</a>
+  <a href="#MQNetworkReader">MQNetworkReader</a>
+  <a href="#MQNetworkWriter">MQNetworkWriter</a>
   <a href="#CanvasPanel">CanvasPanel</a>
   <a href="#MainFrame">MainFrame</a>
 </nav>
@@ -457,51 +467,86 @@
     <div class="class-icon">P</div>
     <div class="class-title">
       <h2>PaintServer</h2>
-      <div class="subtitle"><span class="tag server">server</span> &nbsp; Sunucu giriş noktası — tüm bileşenleri oluşturur ve bağlar</div>
+      <div class="subtitle"><span class="tag server">server</span> &nbsp; Sunucu giriş noktası — Socket veya RabbitMQ modunda çalışır</div>
     </div>
   </div>
 
-  <h3>Görev</h3>
-  <p>Dependency Injection kalıbıyla sunucunun tüm bileşenlerini oluşturur, birbirine bağlar ve başlatır. Handler'lar, registry, disk havuzu, otomatik kayıt ve NIO döngüsü burada bir araya gelir. <code>main()</code> metodu komut satırı argümanını (port numarası) okur.</p>
+  <h3>Görev ve Çift Mod Desteği</h3>
+  <p>Dependency Injection kalıbıyla sunucunun tüm bileşenlerini oluşturur ve birbirine bağlar. Artık iki çalışma modunu destekler: klasik TCP/NIO modu ve RabbitMQ (AMQP) modu. Mod, komut satırından seçilir; tüm iş mantığı (handler'lar, registry, disk havuzu) her iki modda ortaktır.</p>
 
+  <h3>İki Constructor — Mod Seçimi</h3>
 <pre>
-<span class="kw">public void</span> <span class="nm">start</span>() <span class="kw">throws</span> <span class="tp">IOException</span> {
-    <span class="cm">// 1. Altyapı katmanı</span>
+<span class="cm">// Socket modu: port numarası verilir</span>
+<span class="kw">public</span> <span class="nm">PaintServer</span>(<span class="kw">int</span> port, <span class="tp">String</span> filesDirPath) {
+    <span class="kw">this</span>.mqMode = <span class="kw">false</span>;
+    ...
+}
+
+<span class="cm">// MQ modu: broker host adresi verilir (port sabit: 5672)</span>
+<span class="kw">public</span> <span class="nm">PaintServer</span>(<span class="tp">String</span> mqHost, <span class="tp">String</span> filesDirPath) {
+    <span class="kw">this</span>.mqMode = <span class="kw">true</span>;
+    ...
+}
+</pre>
+
+  <h3>start() — Ortak Altyapı + Mod Dallanması</h3>
+<pre>
+<span class="kw">public void</span> <span class="nm">start</span>() <span class="kw">throws</span> <span class="tp">Exception</span> {
+    <span class="cm">// 1. Her iki modda ortak altyapı</span>
     registry  = <span class="kw">new</span> <span class="tp">SessionRegistry</span>();
     fileStore = <span class="kw">new</span> <span class="tp">FileStore</span>(filesDirPath);
-
-    <span class="cm">// 2. Disk I/O için ayrı thread havuzu (2 thread)</span>
-    <span class="cm">// NIO thread'ini bloklamak yerine disk işlemleri buraya gönderilir</span>
-    diskPool = <span class="tp">Executors</span>.newFixedThreadPool(<span class="cn">2</span>, r -&gt; {
-        <span class="tp">Thread</span> t = <span class="kw">new</span> <span class="tp">Thread</span>(r, <span class="st">"DiskPool"</span>);
-        t.setDaemon(<span class="kw">true</span>);
-        <span class="kw">return</span> t;
+    diskPool  = <span class="tp">Executors</span>.newFixedThreadPool(<span class="cn">2</span>, r -&gt; {
+        <span class="tp">Thread</span> t = <span class="kw">new</span> <span class="tp">Thread</span>(r, <span class="st">"DiskPool"</span>); t.setDaemon(<span class="kw">true</span>); <span class="kw">return</span> t;
     });
 
-    <span class="cm">// 3. Handler'lar — her birinin bağımlılıkları constructor'dan verilir</span>
+    <span class="cm">// 2. Handler'lar — bağımlılıklar constructor'dan verilir (DI)</span>
     <span class="tp">LoginHandler</span>     loginHandler     = <span class="kw">new</span> <span class="tp">LoginHandler</span>(registry);
     <span class="tp">FileHandler</span>      fileHandler      = <span class="kw">new</span> <span class="tp">FileHandler</span>(fileStore, registry, diskPool);
     <span class="tp">DrawHandler</span>      drawHandler      = <span class="kw">new</span> <span class="tp">DrawHandler</span>(registry);
     <span class="tp">ClipboardHandler</span> clipboardHandler = <span class="kw">new</span> <span class="tp">ClipboardHandler</span>(registry);
 
-    <span class="cm">// 4. Dispatcher tüm handler'ları bir arada yönetir</span>
+    <span class="cm">// 3. Dispatcher artık registry parametresi de alıyor (USER_LIST_REQ için)</span>
     <span class="tp">MessageDispatcher</span> dispatcher = <span class="kw">new</span> <span class="tp">MessageDispatcher</span>(
-        loginHandler, fileHandler, drawHandler, clipboardHandler);
+        loginHandler, fileHandler, drawHandler, clipboardHandler, registry);
 
-    <span class="cm">// 5. Otomatik kayıt zamanlayıcısı</span>
-    autoSaveScheduler = <span class="kw">new</span> <span class="tp">AutoSaveScheduler</span>(registry, fileStore, fileHandler, <span class="cn">60</span>);
+    <span class="cm">// 4. Otomatik kayıt zamanlayıcısı (60 saniye)</span>
+    autoSaveScheduler = <span class="kw">new</span> <span class="tp">AutoSaveScheduler</span>(
+        registry, fileStore, fileHandler,
+        <span class="tp">ProtocolConstants</span>.AUTO_SAVE_INTERVAL_SECONDS);
     autoSaveScheduler.start();
 
-    <span class="cm">// 6. NIO döngüsü — son başlatılan, her şey hazır olmalı</span>
-    nioSelector = <span class="kw">new</span> <span class="tp">NIOSelector</span>(port, dispatcher, registry);
-    nioSelector.start();
+    <span class="cm">// 5. Transport katmanı — mod'a göre ayrılır</span>
+    <span class="kw">if</span> (mqMode) startMQMode(dispatcher);
+    <span class="kw">else</span>        startSocketMode(dispatcher);
 }
-
-<span class="cm">// JVM kapanırken düzgün kapatma (Ctrl+C)</span>
-<span class="tp">Runtime</span>.getRuntime().addShutdownHook(<span class="kw">new</span> <span class="tp">Thread</span>(server::stop, <span class="st">"Shutdown"</span>));
 </pre>
 
-  <div class="ok"><strong>Mimari karar:</strong> Disk I/O için 2 thread'lik ayrı havuz (DiskPool) kullanılır. Bu sayede dosya okuma/yazma işlemleri NIO thread'ini bloklamaz, diğer istemciler beklemez.</div>
+  <h3>startMQMode() — RabbitMQ Transport</h3>
+<pre>
+<span class="kw">private void</span> <span class="nm">startMQMode</span>(<span class="tp">MessageDispatcher</span> dispatcher) <span class="kw">throws</span> <span class="tp">Exception</span> {
+    <span class="cm">// MQBroker: AMQP bağlantısı + exchange/queue bildirimi</span>
+    mqBroker = <span class="kw">new</span> <span class="tp">MQBroker</span>(mqHost, <span class="tp">MQConfig</span>.DEFAULT_AMQP_PORT);
+    mqBroker.connect();
+
+    <span class="cm">// Registry'ye broker verilir → broadcastToAll() fanout kullanır</span>
+    registry.setMQBroker(mqBroker);
+
+    <span class="cm">// MQServerTransport: paint.server kuyruğunu tüketir, mesajları dispatcher'a iletir</span>
+    mqTransport = <span class="kw">new</span> <span class="tp">MQServerTransport</span>(mqBroker, dispatcher, registry);
+    mqTransport.start();
+}
+</pre>
+
+  <h3>Komut Satırı Kullanımı</h3>
+  <table>
+    <tr><th>Komut</th><th>Mod</th><th>Açıklama</th></tr>
+    <tr><td><code>java -jar ...Server.jar</code></td><td>Socket</td><td>Port 9090, varsayılan</td></tr>
+    <tr><td><code>java -jar ...Server.jar 9091</code></td><td>Socket</td><td>Port 9091</td></tr>
+    <tr><td><code>java -jar ...Server.jar --mq</code></td><td>RabbitMQ</td><td>localhost:5672</td></tr>
+    <tr><td><code>java -jar ...Server.jar --mq 192.168.1.5</code></td><td>RabbitMQ</td><td>Uzak broker</td></tr>
+  </table>
+
+  <div class="ok"><strong>Mimari karar:</strong> İş mantığı (handler'lar, dispatcher, registry) her iki modda tamamen aynı kodla çalışır. Yalnızca transport katmanı değişir: socket modunda NIOSelector, MQ modunda MQServerTransport. Bu Clean Architecture prensibiyle örtüşür.</div>
 </div>
 
 <!-- NIOSelector -->
@@ -710,15 +755,24 @@
     </div>
   </div>
 
+  <h3>Constructor — Artık Registry de Alıyor</h3>
+<pre>
+<span class="cm">// USER_LIST_REQ doğrudan dispatcher'da işleniyor; registry gerekiyor</span>
+<span class="kw">public</span> <span class="nm">MessageDispatcher</span>(<span class="tp">LoginHandler</span> lh, <span class="tp">FileHandler</span> fh,
+                          <span class="tp">DrawHandler</span> dh, <span class="tp">ClipboardHandler</span> ch,
+                          <span class="tp">SessionRegistry</span> registry) { ... }
+</pre>
+
+  <h3>dispatch() — FSM'e Göre Yönlendirme</h3>
 <pre>
 <span class="kw">public boolean</span> <span class="nm">dispatch</span>(<span class="tp">ClientSession</span> session, <span class="tp">Message</span> msg) {
     <span class="kw">switch</span> (session.getState()) {
         <span class="kw">case</span> HANDSHAKE:
             <span class="cm">// Yalnızca LOGIN_REQ kabul edilir</span>
             <span class="kw">if</span> (msg.getType() != <span class="tp">MessageType</span>.LOGIN_REQ) {
-                enqueue(session, encodeError(<span class="st">"Login required first"</span>));
-                session.transitionTo(FSMState.ERROR);
-                <span class="kw">return false</span>; <span class="cm">// bağlantıyı kapat</span>
+                session.enqueue(<span class="tp">MessageEncoder</span>.encodeError(<span class="st">"Login required first"</span>));
+                session.transitionTo(<span class="tp">FSMState</span>.ERROR);
+                <span class="kw">return false</span>;
             }
             loginHandler.handle(session, msg);
             <span class="kw">return true</span>;
@@ -729,34 +783,49 @@
         <span class="kw">case</span> SAVING:
             <span class="cm">// Diske yazım sırasında sadece PING kabul edilir</span>
             <span class="kw">if</span> (msg.getType() == <span class="tp">MessageType</span>.PING) {
-                enqueue(session, encodePong());
+                session.enqueue(<span class="tp">MessageEncoder</span>.encodePong());
                 session.updatePingTime();
             }
-            <span class="kw">return true</span>; <span class="cm">// diğer mesajlar yok sayılır</span>
+            <span class="kw">return true</span>;
     }
 }
+</pre>
 
+  <h3>dispatchActive() — USER_LIST_REQ Eklendi</h3>
+<pre>
 <span class="kw">private boolean</span> <span class="nm">dispatchActive</span>(<span class="tp">ClientSession</span> session, <span class="tp">Message</span> msg) {
     <span class="kw">switch</span> (msg.getType()) {
-        <span class="kw">case</span> FILE_CREATE_REQ:   fileHandler.handleCreate(session, msg);    <span class="kw">break</span>;
-        <span class="kw">case</span> FILE_OPEN_REQ:     fileHandler.handleOpen(session, msg);      <span class="kw">break</span>;
+        <span class="kw">case</span> FILE_CREATE_REQ:         fileHandler.handleCreate(session, msg);    <span class="kw">break</span>;
+        <span class="kw">case</span> FILE_OPEN_REQ:           fileHandler.handleOpen(session, msg);      <span class="kw">break</span>;
         <span class="kw">case</span> FILE_SAVE_REQ:
-            session.transitionTo(FSMState.SAVING);  <span class="cm">// önce durum değişir</span>
+            session.transitionTo(<span class="tp">FSMState</span>.SAVING); <span class="cm">// önce durum değişir</span>
             fileHandler.handleSave(session, msg);   <span class="cm">// sonra disk thread'e gönder</span>
             <span class="kw">break</span>;
-        <span class="kw">case</span> DRAW_EVENT:        drawHandler.handle(session, msg);          <span class="kw">break</span>;
-        <span class="kw">case</span> CANVAS_SNAPSHOT_DATA: fileHandler.handleSnapshotData(session, msg); <span class="kw">break</span>;
+        <span class="kw">case</span> FILE_DELETE_REQ:         fileHandler.handleDelete(session, msg);    <span class="kw">break</span>;
+        <span class="kw">case</span> FILE_LIST_REQ:           fileHandler.handleList(session, msg);      <span class="kw">break</span>;
+        <span class="kw">case</span> DRAW_EVENT:              drawHandler.handle(session, msg);          <span class="kw">break</span>;
+        <span class="kw">case</span> CANVAS_SNAPSHOT_DATA:    fileHandler.handleSnapshotData(session, msg); <span class="kw">break</span>;
         <span class="kw">case</span> CLIPBOARD_COPY:
-        <span class="kw">case</span> CLIPBOARD_CUT:     clipboardHandler.handleCopyOrCut(session, msg); <span class="kw">break</span>;
-        <span class="kw">case</span> CLIPBOARD_PASTE_REQ: clipboardHandler.handlePasteReq(session, msg); <span class="kw">break</span>;
+        <span class="kw">case</span> CLIPBOARD_CUT:           clipboardHandler.handleCopyOrCut(session, msg); <span class="kw">break</span>;
+        <span class="kw">case</span> CLIPBOARD_PASTE_REQ:     clipboardHandler.handlePasteReq(session, msg); <span class="kw">break</span>;
+
+        <span class="cm">// Bağlı kullanıcıların listesini döndür (YENİ)</span>
+        <span class="kw">case</span> USER_LIST_REQ:
+            session.enqueue(<span class="tp">MessageEncoder</span>.encodeUserListResp(
+                registry.getAllUsernames()));
+            <span class="kw">break</span>;
+
         <span class="kw">case</span> PING:
-            enqueue(session, encodePong()); session.updatePingTime(); <span class="kw">break</span>;
+            session.enqueue(<span class="tp">MessageEncoder</span>.encodePong());
+            session.updatePingTime();
+            <span class="kw">break</span>;
     }
     <span class="kw">return true</span>;
 }
 </pre>
 
   <div class="info"><strong>FILE_SAVE_REQ özel durumu:</strong> Durum geçişi (<code>SAVING</code>) disk işlemi başlamadan önce yapılır. Bu sayede disk thread'i çalışırken gelen başka mesajlar yok sayılır. Yazım bitince FileHandler ACTIVE'e geri döner.</div>
+  <div class="note"><strong>session.enqueue() artık doğrudan çağrılıyor</strong> — eski <code>writeQueue.offer()</code> yerine. Bu her iki modu da aynı kod üzerinden çalıştırır.</div>
 </div>
 
 <!-- ClientSession -->
@@ -765,39 +834,75 @@
     <div class="class-icon">S</div>
     <div class="class-title">
       <h2>ClientSession</h2>
-      <div class="subtitle"><span class="tag server">server</span> &nbsp; Bir istemci bağlantısının tüm durumunu tutan veri nesnesi</div>
+      <div class="subtitle"><span class="tag server">server</span> &nbsp; Bir istemci bağlantısının tüm durumunu tutan veri nesnesi — Socket ve MQ modunu destekler</div>
     </div>
   </div>
 
-  <h3>Barındırdığı Veriler</h3>
+  <h3>İki Constructor — Socket vs MQ Modu</h3>
 <pre>
-<span class="kw">public class</span> <span class="tp">ClientSession</span> {
-    <span class="cm">// Kimlik</span>
-    <span class="kw">private final int</span>          sessionId;
-    <span class="kw">private final</span> <span class="tp">SocketChannel</span> channel;
-    <span class="kw">private</span>       <span class="tp">FSMState</span>       state = <span class="tp">FSMState</span>.HANDSHAKE;
-    <span class="kw">private</span>       <span class="tp">String</span>         username = <span class="kw">null</span>;
+<span class="cm">// Socket modu: NIO SocketChannel ile</span>
+<span class="kw">public</span> <span class="nm">ClientSession</span>(<span class="kw">int</span> sessionId, <span class="tp">SocketChannel</span> channel) {
+    <span class="kw">this</span>.sessionId = sessionId;
+    <span class="kw">this</span>.channel   = channel;
+}
 
-    <span class="cm">// NIO frame birleştirme (MessageFramer kullanır)</span>
-    <span class="kw">public final</span>  <span class="tp">ByteBuffer</span>     readBuffer;   <span class="cm">// 64 KB gelen ham baytlar</span>
-    <span class="kw">final</span>         <span class="tp">ByteBuffer</span>     headerBuf;   <span class="cm">// 8 bayt başlık biriktiricisi</span>
-    <span class="kw">volatile</span>      <span class="tp">ByteBuffer</span>     payloadBuf;  <span class="cm">// null=Aşama1, dolu=Aşama2</span>
-    <span class="kw">byte</span>                         pendingTypeCode;
-
-    <span class="cm">// Giden mesaj kuyruğu — ConcurrentLinkedQueue: thread-safe, lock-free</span>
-    <span class="kw">public final</span> <span class="tp">ConcurrentLinkedQueue</span>&lt;<span class="tp">ByteBuffer</span>&gt; writeQueue;
-
-    <span class="cm">// Açık dosyalar ve pano</span>
-    <span class="kw">private final</span> <span class="tp">Set</span>&lt;<span class="tp">Integer</span>&gt; openFileIds = <span class="kw">new</span> <span class="tp">HashSet</span>&lt;&gt;();
-    <span class="kw">private byte</span>[]              clipboardData;
-    <span class="kw">private int</span>                 clipboardWidth, clipboardHeight;
-
-    <span class="cm">// Keepalive</span>
-    <span class="kw">private long</span>                lastPingTime = <span class="tp">System</span>.currentTimeMillis();
+<span class="cm">// MQ modu: channel null; istemcinin reply kuyruğu adıyla</span>
+<span class="kw">public</span> <span class="nm">ClientSession</span>(<span class="kw">int</span> sessionId, <span class="tp">String</span> mqReplyTo) {
+    <span class="kw">this</span>.sessionId  = sessionId;
+    <span class="kw">this</span>.channel    = <span class="kw">null</span>;
+    <span class="kw">this</span>.mqReplyTo  = mqReplyTo;
 }
 </pre>
 
-  <div class="info"><strong>writeQueue neden ConcurrentLinkedQueue?</strong> Handler sınıfları diskPool thread'inden mesaj ekler, NIO thread'i kuyruktan okur. İkisi eş zamanlı çalışır. <code>ConcurrentLinkedQueue</code> lock-free olduğundan hem thread-safe hem yüksek performanslıdır.</div>
+  <h3>Barındırdığı Alanlar</h3>
+<pre>
+<span class="kw">public class</span> <span class="tp">ClientSession</span> {
+    <span class="cm">// Kimlik</span>
+    <span class="kw">private final int</span>           sessionId;
+    <span class="kw">private final</span> <span class="tp">SocketChannel</span>  channel;      <span class="cm">// MQ modunda null</span>
+    <span class="kw">private</span>       <span class="tp">FSMState</span>        state = <span class="tp">FSMState</span>.HANDSHAKE;
+    <span class="kw">private</span>       <span class="tp">String</span>          username = <span class="kw">null</span>;
+
+    <span class="cm">// MQ modu alanları</span>
+    <span class="kw">private</span>       <span class="tp">String</span>              mqReplyTo; <span class="cm">// istemcinin özel kuyruk adı</span>
+    <span class="kw">private</span>       <span class="tp">Consumer</span>&lt;<span class="kw">byte</span>[]&gt;    mqSink;    <span class="cm">// takılabilir gönderim noktası</span>
+
+    <span class="cm">// NIO frame birleştirme — socket modunda kullanılır</span>
+    <span class="kw">public final</span>  <span class="tp">ByteBuffer</span>          readBuffer;   <span class="cm">// 64 KB gelen ham baytlar</span>
+    <span class="kw">final</span>         <span class="tp">ByteBuffer</span>          headerBuf;    <span class="cm">// 8 bayt başlık biriktiricisi</span>
+    <span class="kw">volatile</span>      <span class="tp">ByteBuffer</span>          payloadBuf;   <span class="cm">// null=Aşama1, dolu=Aşama2</span>
+    <span class="kw">byte</span>                               pendingTypeCode;
+
+    <span class="cm">// Giden mesaj kuyruğu — socket modunda NIOSelector tarafından drene edilir</span>
+    <span class="kw">public final</span> <span class="tp">ConcurrentLinkedQueue</span>&lt;<span class="tp">ByteBuffer</span>&gt; writeQueue;
+
+    <span class="cm">// Açık dosyalar ve pano</span>
+    <span class="kw">private final</span> <span class="tp">Set</span>&lt;<span class="tp">Integer</span>&gt; openFileIds;
+    <span class="kw">private byte</span>[]             clipboardData;
+    <span class="kw">private int</span>                clipboardWidth, clipboardHeight;
+
+    <span class="cm">// Keepalive</span>
+    <span class="kw">private long</span>               lastPingTime = <span class="tp">System</span>.currentTimeMillis();
+}
+</pre>
+
+  <h3>enqueue() — Birleşik Gönderim</h3>
+<pre>
+<span class="cm">// Handler'lar bu metodu çağırır — mod farkı burada gizlenir</span>
+<span class="kw">public void</span> <span class="nm">enqueue</span>(<span class="kw">byte</span>[] data) {
+    <span class="kw">if</span> (mqSink != <span class="kw">null</span>) {
+        mqSink.accept(data);                       <span class="cm">// MQ modu: AMQP basicPublish</span>
+    } <span class="kw">else</span> {
+        writeQueue.offer(<span class="tp">ByteBuffer</span>.wrap(data)); <span class="cm">// Socket modu: NIO kuyruğu</span>
+    }
+}
+
+<span class="cm">// MQServerTransport tarafından çağrılır; broker.sendToClient(replyTo, frame) ile bağlanır</span>
+<span class="kw">public void</span> <span class="nm">setMqSink</span>(<span class="tp">Consumer</span>&lt;<span class="kw">byte</span>[]&gt; sink) { <span class="kw">this</span>.mqSink = sink; }
+</pre>
+
+  <div class="info"><strong>Tasarım:</strong> Eski kod handler'lardan <code>session.writeQueue.offer()</code> çağırıyordu. Bu MQ modunu kırardı (writeQueue NIO-only). Şimdi her handler <code>session.enqueue()</code> çağırır; içeride hangi mekanizmanın kullanılacağını session bilir. Strategy Pattern'in basit bir uygulamasıdır.</div>
+  <div class="ok"><strong>writeQueue neden hâlâ var?</strong> Socket modunda NIOSelector, kuyruğu drene ederek <code>channel.write()</code> yapar. MQ modunda bu kuyruk boş kalır; <code>mqSink != null</code> olduğundan <code>enqueue()</code> oraya hiç yazmaz.</div>
 </div>
 
 <!-- SESSION REGISTRY -->
@@ -806,7 +911,7 @@
     <div class="class-icon">R</div>
     <div class="class-title">
       <h2>SessionRegistry</h2>
-      <div class="subtitle"><span class="tag store">store</span> &nbsp; Aktif oturumların merkezi kaydı — broadcast merkezi</div>
+      <div class="subtitle"><span class="tag store">store</span> &nbsp; Aktif oturumların merkezi kaydı — Socket ve MQ modunda broadcast merkezi</div>
     </div>
   </div>
 
@@ -816,31 +921,46 @@
     <span class="kw">private final</span> <span class="tp">Map</span>&lt;<span class="tp">Integer</span>, <span class="tp">ClientSession</span>&gt; bySessionId = <span class="kw">new</span> <span class="tp">ConcurrentHashMap</span>&lt;&gt;();
     <span class="kw">private final</span> <span class="tp">Map</span>&lt;<span class="tp">String</span>,  <span class="tp">ClientSession</span>&gt; byUsername   = <span class="kw">new</span> <span class="tp">ConcurrentHashMap</span>&lt;&gt;();
 
-    <span class="cm">// Belirli bir dosyayı açık olan tüm oturumları döndür</span>
-    <span class="kw">public</span> <span class="tp">List</span>&lt;<span class="tp">ClientSession</span>&gt; <span class="nm">getSessionsWithFileOpen</span>(<span class="kw">int</span> fileId) {
-        <span class="tp">List</span>&lt;<span class="tp">ClientSession</span>&gt; result = <span class="kw">new</span> <span class="tp">ArrayList</span>&lt;&gt;();
-        <span class="kw">for</span> (<span class="tp">ClientSession</span> s : bySessionId.values())
-            <span class="kw">if</span> (s.isLoggedIn() &amp;&amp; s.hasFileOpen(fileId)) result.add(s);
-        <span class="kw">return</span> result;
-    }
+    <span class="cm">// MQ modunda PaintServer tarafından set edilir</span>
+    <span class="kw">private</span> <span class="tp">MQBroker</span> mqBroker = <span class="kw">null</span>;
 
-    <span class="cm">// Tüm giriş yapmış istemcilere yayın (göndereni hariç tut)</span>
-    <span class="kw">public void</span> <span class="nm">broadcastToAll</span>(<span class="kw">byte</span>[] encoded, <span class="kw">int</span> excludeSessionId) {
-        <span class="kw">for</span> (<span class="tp">ClientSession</span> s : bySessionId.values())
-            <span class="kw">if</span> (s.getSessionId() != excludeSessionId &amp;&amp; s.isLoggedIn())
-                s.writeQueue.offer(<span class="tp">ByteBuffer</span>.wrap(encoded));
-    }
-
-    <span class="cm">// Yalnızca belirtilen dosyayı açık olan istemcilere yayın</span>
-    <span class="kw">public void</span> <span class="nm">broadcastToFileViewers</span>(<span class="kw">int</span> fileId, <span class="kw">byte</span>[] encoded, <span class="kw">int</span> excludeSessionId) {
-        <span class="kw">for</span> (<span class="tp">ClientSession</span> s : getSessionsWithFileOpen(fileId))
-            <span class="kw">if</span> (s.getSessionId() != excludeSessionId)
-                s.writeQueue.offer(<span class="tp">ByteBuffer</span>.wrap(encoded));
-    }
+    <span class="kw">public void</span> <span class="nm">setMQBroker</span>(<span class="tp">MQBroker</span> broker) { <span class="kw">this</span>.mqBroker = broker; }
 }
 </pre>
 
-  <div class="ok"><strong>broadcastToFileViewers() kritik önemi:</strong> DRAW_EVENT, CANVAS_UPDATE ve CLIPBOARD_DATA için sadece aynı dosyayı açık olan istemcilere gönderim yapılır. Bu sayede farklı dosyalar üzerinde çalışan istemciler birbirlerinin mesajlarıyla ilgilenmez.</div>
+  <h3>broadcastToAll() — Mod'a Göre Davranış</h3>
+<pre>
+<span class="cm">// USER_JOIN, USER_LEAVE, FILE_LIST_RESP için tüm istemcilere gönderim</span>
+<span class="kw">public void</span> <span class="nm">broadcastToAll</span>(<span class="kw">byte</span>[] encoded, <span class="kw">int</span> excludeSessionId) {
+    <span class="kw">if</span> (mqBroker != <span class="kw">null</span>) {
+        <span class="cm">// MQ modu: paint.global fanout exchange'e tek publish → herkese ulaşır</span>
+        <span class="cm">// excludeSessionId burada işe yaramaz; istemci kendi USER_JOIN'ini alır, GUI yok sayar</span>
+        mqBroker.broadcastGlobal(encoded);
+        <span class="kw">return</span>;
+    }
+    <span class="cm">// Socket modu: oturum döngüsüyle her birine ayrı ayrı gönder</span>
+    <span class="kw">for</span> (<span class="tp">ClientSession</span> s : bySessionId.values())
+        <span class="kw">if</span> (s.getSessionId() != excludeSessionId &amp;&amp; s.isLoggedIn())
+            enqueue(s, encoded);
+}
+</pre>
+
+  <h3>broadcastToFileViewers() — Her İki Modda Per-Session</h3>
+<pre>
+<span class="cm">// DRAW_BROADCAST, CANVAS_UPDATE, CLIPBOARD_DATA: yalnızca aynı dosyayı açık olanlara</span>
+<span class="cm">// MQ modunda da per-session gönderim yapılır; çünkü fanout exchange göndereni hariç tutamaz</span>
+<span class="kw">public void</span> <span class="nm">broadcastToFileViewers</span>(<span class="kw">int</span> fileId, <span class="kw">byte</span>[] encoded, <span class="kw">int</span> excludeSessionId) {
+    <span class="kw">for</span> (<span class="tp">ClientSession</span> s : getSessionsWithFileOpen(fileId))
+        <span class="kw">if</span> (s.getSessionId() != excludeSessionId)
+            enqueue(s, encoded); <span class="cm">// → session.enqueue() → mqSink veya writeQueue</span>
+}
+
+<span class="kw">private void</span> <span class="nm">enqueue</span>(<span class="tp">ClientSession</span> s, <span class="kw">byte</span>[] data) {
+    s.enqueue(data); <span class="cm">// mod farkı ClientSession.enqueue() içinde gizli</span>
+}
+</pre>
+
+  <div class="ok"><strong>broadcastToAll() farkı:</strong> Global olaylar (USER_JOIN/LEAVE) MQ modunda fanout exchange'den yayılır — verimli ve ölçeklenebilir. Dosya-özel olaylar (DRAW_BROADCAST) ise hem modda per-session kalır; aksi hâlde farklı dosyalardaki istemciler de mesajı alırdı.</div>
 </div>
 
 <!-- FileMetadata -->
@@ -1120,30 +1240,111 @@
     <div class="class-icon">C</div>
     <div class="class-title">
       <h2>ConnectionManager</h2>
-      <div class="subtitle"><span class="tag client">client</span> &nbsp; TCP bağlantı yöneticisi, PING zamanlayıcısı, mesaj gönderme API'si</div>
+      <div class="subtitle"><span class="tag client">client</span> &nbsp; Bağlantı yöneticisi — TCP/NIO ve RabbitMQ modlarını destekler</div>
     </div>
   </div>
 
+  <h3>Çift Transport — Alanlar</h3>
+<pre>
+<span class="cm">// Socket modu alanları</span>
+<span class="kw">private</span> <span class="tp">Socket</span>        socket;
+<span class="kw">private</span> <span class="tp">NetworkReader</span> reader;
+<span class="kw">private</span> <span class="tp">NetworkWriter</span> writer;
+
+<span class="cm">// MQ modu alanları</span>
+<span class="kw">private</span> <span class="tp">Connection</span>      mqConnection;
+<span class="kw">private</span> <span class="tp">Channel</span>         mqChannel;
+<span class="kw">private</span> <span class="tp">MQNetworkReader</span> mqReader;
+<span class="kw">private</span> <span class="tp">MQNetworkWriter</span> mqWriter;
+<span class="kw">private</span> <span class="tp">String</span>          clientQueueName;  <span class="cm">// UUID ile üretilen özel kuyruk adı</span>
+
+<span class="cm">// Ortak</span>
+<span class="kw">private boolean</span> mqMode = <span class="kw">false</span>;
+</pre>
+
+  <h3>connect() — Socket Modu</h3>
 <pre>
 <span class="kw">public synchronized void</span> <span class="nm">connect</span>(<span class="tp">String</span> host, <span class="kw">int</span> port) <span class="kw">throws</span> <span class="tp">IOException</span> {
-    state = <span class="tp">FSMState</span>.CONNECTING;
+    state  = <span class="tp">FSMState</span>.CONNECTING;
+    mqMode = <span class="kw">false</span>;
     socket = <span class="kw">new</span> <span class="tp">Socket</span>(host, port);
-    socket.setTcpNoDelay(<span class="kw">true</span>); <span class="cm">// Nagle algoritmasını kapat — küçük paketler anında gider</span>
+    socket.setTcpNoDelay(<span class="kw">true</span>); <span class="cm">// Nagle kapalı: DRAW_EVENT anında iletilir</span>
 
     writer = <span class="kw">new</span> <span class="tp">NetworkWriter</span>(); writer.start(socket.getOutputStream());
     reader = <span class="kw">new</span> <span class="tp">NetworkReader</span>(messageHandler, this::handleDisconnect);
     reader.start(socket.getInputStream());
 
     state = <span class="tp">FSMState</span>.LOGGING_IN;
-
-    <span class="cm">// PING zamanlayıcısı: 30s'de bir PING gönder (sunucu 90s'de timeout verir)</span>
-    pingScheduler.scheduleAtFixedRate(() -&gt; {
-        <span class="kw">if</span> (state == <span class="tp">FSMState</span>.CONNECTED) sendPing();
-    }, <span class="cn">30</span>, <span class="cn">30</span>, <span class="tp">TimeUnit</span>.SECONDS);
+    startPingScheduler();
 }
 </pre>
 
-  <div class="info"><code>setTcpNoDelay(true)</code> Nagle algoritmasını devre dışı bırakır. Nagle küçük paketleri biriktirerek büyük paket yapar — latency artar. Gerçek zamanlı çizim için her DRAW_EVENT anında iletilmeli, bu yüzden Nagle kapatılır.</div>
+  <h3>connectMQ() — RabbitMQ Modu</h3>
+<pre>
+<span class="kw">public synchronized void</span> <span class="nm">connectMQ</span>(<span class="tp">String</span> brokerHost, <span class="kw">int</span> amqpPort)
+        <span class="kw">throws</span> <span class="tp">IOException</span>, <span class="tp">TimeoutException</span> {
+    state  = <span class="tp">FSMState</span>.CONNECTING;
+    mqMode = <span class="kw">true</span>;
+
+    <span class="tp">ConnectionFactory</span> factory = <span class="kw">new</span> <span class="tp">ConnectionFactory</span>();
+    factory.setHost(brokerHost);   factory.setPort(amqpPort);
+    factory.setVirtualHost(<span class="tp">MQConfig</span>.VHOST);
+    factory.setUsername(<span class="tp">MQConfig</span>.USER); factory.setPassword(<span class="tp">MQConfig</span>.PASSWORD);
+    factory.setAutomaticRecoveryEnabled(<span class="kw">true</span>);
+
+    mqConnection    = factory.newConnection(<span class="st">"MultiUserPaint-Client"</span>);
+    mqChannel       = mqConnection.createChannel();
+
+    <span class="cm">// UUID ile benzersiz kuyruk adı: paint.client.&lt;uuid&gt;</span>
+    clientQueueName = <span class="tp">MQConfig</span>.clientQueue(<span class="tp">UUID</span>.randomUUID().toString());
+
+    <span class="cm">// Server kuyruğunun var olduğundan emin ol (idempotent)</span>
+    mqChannel.queueDeclare(<span class="tp">MQConfig</span>.SERVER_QUEUE, <span class="kw">false</span>, <span class="kw">false</span>, <span class="kw">false</span>, <span class="kw">null</span>);
+
+    mqReader = <span class="kw">new</span> <span class="tp">MQNetworkReader</span>(messageHandler, this::handleDisconnect);
+    mqReader.start(mqChannel, clientQueueName);
+
+    mqWriter = <span class="kw">new</span> <span class="tp">MQNetworkWriter</span>();
+    mqWriter.start(mqChannel, clientQueueName);
+
+    state = <span class="tp">FSMState</span>.LOGGING_IN;
+    startPingScheduler();
+}
+</pre>
+
+  <h3>send() — Mod'a Göre Yönlendirme</h3>
+<pre>
+<span class="kw">public void</span> <span class="nm">send</span>(<span class="kw">byte</span>[] data) {
+    <span class="kw">if</span> (mqMode) { <span class="kw">if</span> (mqWriter != <span class="kw">null</span>) mqWriter.send(data); }
+    <span class="kw">else</span>        { <span class="kw">if</span> (writer  != <span class="kw">null</span>) writer.send(data);  }
+}
+</pre>
+
+  <h3>File Exchange Aboneliği — MQ'ya Özgü</h3>
+<pre>
+<span class="cm">// FILE_OPEN_DATA alındıktan sonra MainFrame bu metodu çağırır</span>
+<span class="cm">// MQNetworkReader, paint.file.{fileId} fanout exchange'e kuyruk bağlar</span>
+<span class="kw">public void</span> <span class="nm">notifyFileOpened</span>(<span class="kw">int</span> fileId) {
+    <span class="kw">if</span> (mqMode &amp;&amp; mqReader != <span class="kw">null</span>) mqReader.bindToFileExchange(fileId);
+}
+
+<span class="kw">public void</span> <span class="nm">notifyFileClosed</span>(<span class="kw">int</span> fileId) {
+    <span class="kw">if</span> (mqMode &amp;&amp; mqReader != <span class="kw">null</span>) mqReader.unbindFromFileExchange(fileId);
+}
+</pre>
+
+  <h3>onLoginOk() — SESSION ID Güncelleme</h3>
+<pre>
+<span class="kw">public void</span> <span class="nm">onLoginOk</span>(<span class="kw">int</span> sessionId) {
+    <span class="kw">this</span>.sessionId = sessionId;
+    <span class="kw">this</span>.state     = <span class="tp">FSMState</span>.CONNECTED;
+    <span class="cm">// MQ modunda writer her mesaja sessionId header'ı eklemeye başlar</span>
+    <span class="kw">if</span> (mqMode &amp;&amp; mqWriter != <span class="kw">null</span>) mqWriter.setSessionId(sessionId);
+}
+</pre>
+
+  <div class="info"><code>setTcpNoDelay(true)</code> Nagle algoritmasını devre dışı bırakır. Nagle küçük paketleri biriktirerek büyük paket yapar — latency artar. Gerçek zamanlı çizim için her DRAW_EVENT anında iletilmeli, bu yüzden Nagle kapatılır (yalnızca socket modunda geçerli).</div>
+  <div class="note"><strong>MQ modunda UUID:</strong> Her istemci oturumu açıldığında benzersiz bir kuyruk adı üretilir (<code>paint.client.&lt;uuid&gt;</code>). Bu sayede aynı makine üzerinde birden fazla istemci çalışabilir ve kuyruklar çakışmaz.</div>
 </div>
 
 <!-- NetworkReader -->
@@ -1399,6 +1600,330 @@
 </pre>
 
   <div class="ok"><strong>openCanvases: Map&lt;Integer, CanvasPanel&gt;</strong> — fileId ile canvas eşlemesi, her mesajda doğru canvas'ı bulmak için kullanılır. Kullanıcı aynı anda birden fazla dosya açabilir; her biri ayrı sekme ve ayrı CanvasPanel'dir.</div>
+</div>
+
+<!-- ============================================================ MQ INFRASTRUCTURE -->
+<div class="divider"></div>
+<h1>BÖLÜM 4 — RabbitMQ Altyapısı</h1>
+<p>Bu bölüm, klasik TCP/NIO katmanının RabbitMQ (AMQP) ile değiştirilmesini sağlayan sınıfları açıklar. İş mantığı (handler'lar, dispatcher) değişmeden kalır; yalnızca mesajların taşınma biçimi değişir.</p>
+
+<h3>RabbitMQ Topoloji Özeti</h3>
+<table>
+  <tr><th>İsim</th><th>Tür</th><th>Kullanım</th></tr>
+  <tr><td><code>paint.server</code></td><td>Queue (durable=false)</td><td>Tüm istemci → sunucu mesajları buraya gelir</td></tr>
+  <tr><td><code>paint.global</code></td><td>Fanout Exchange</td><td>USER_JOIN / USER_LEAVE / FILE_LIST_RESP: herkese</td></tr>
+  <tr><td><code>paint.file.{fileId}</code></td><td>Fanout Exchange (autoDelete)</td><td>DRAW_BROADCAST / CANVAS_UPDATE: dosya izleyicilerine</td></tr>
+  <tr><td><code>paint.client.{uuid}</code></td><td>Exclusive Queue (autoDelete)</td><td>Sunucu → tek istemci yanıtları (LOGIN_OK, FILE_OPEN_DATA…)</td></tr>
+</table>
+
+<!-- MQConfig -->
+<div class="class-card" id="MQConfig">
+  <div class="class-header">
+    <div class="class-icon">C</div>
+    <div class="class-title">
+      <h2>MQConfig</h2>
+      <div class="subtitle"><span class="tag mq">mq</span> &nbsp; RabbitMQ topoloji sabitleri — sunucu ve istemci ortak kullanır</div>
+    </div>
+  </div>
+
+  <h3>Görev</h3>
+  <p>Kuyruk/exchange isimleri, bağlantı varsayılanları ve AMQP header anahtarları burada tanımlanır. <code>ProtocolConstants</code> ile aynı mantık: tek bir dosya değişince her yer güncellenir. Sınıf örneklenemez (<code>private</code> constructor).</p>
+
+<pre>
+<span class="kw">public final class</span> <span class="tp">MQConfig</span> {
+    <span class="cm">// Bağlantı varsayılanları</span>
+    <span class="kw">public static final</span> <span class="tp">String</span> DEFAULT_HOST      = <span class="st">"localhost"</span>;
+    <span class="kw">public static final int</span>    DEFAULT_AMQP_PORT = <span class="cn">5672</span>;
+    <span class="kw">public static final</span> <span class="tp">String</span> VHOST             = <span class="st">"/"</span>;
+    <span class="kw">public static final</span> <span class="tp">String</span> USER              = <span class="st">"guest"</span>;
+    <span class="kw">public static final</span> <span class="tp">String</span> PASSWORD          = <span class="st">"guest"</span>;
+
+    <span class="cm">// Statik kuyruk / exchange isimleri</span>
+    <span class="kw">public static final</span> <span class="tp">String</span> SERVER_QUEUE        = <span class="st">"paint.server"</span>;
+    <span class="kw">public static final</span> <span class="tp">String</span> EXCHANGE_GLOBAL     = <span class="st">"paint.global"</span>;
+    <span class="kw">public static final</span> <span class="tp">String</span> FILE_EXCHANGE_PREFIX = <span class="st">"paint.file."</span>;
+    <span class="kw">public static final</span> <span class="tp">String</span> CLIENT_QUEUE_PREFIX  = <span class="st">"paint.client."</span>;
+
+    <span class="cm">// AMQP mesaj header anahtarları</span>
+    <span class="kw">public static final</span> <span class="tp">String</span> HDR_SESSION_ID = <span class="st">"sessionId"</span>;
+    <span class="kw">public static final</span> <span class="tp">String</span> HDR_REPLY_TO   = <span class="st">"replyTo"</span>;
+
+    <span class="cm">// Yardımcılar: dinamik isimler için</span>
+    <span class="kw">public static</span> <span class="tp">String</span> <span class="nm">fileExchange</span>(<span class="kw">int</span> fileId)      { <span class="kw">return</span> FILE_EXCHANGE_PREFIX + fileId; }
+    <span class="kw">public static</span> <span class="tp">String</span> <span class="nm">clientQueue</span>(<span class="tp">String</span> clientId) { <span class="kw">return</span> CLIENT_QUEUE_PREFIX + clientId; }
+}
+</pre>
+
+  <div class="info"><strong>HDR_REPLY_TO ve HDR_SESSION_ID:</strong> İstemci her mesajda bu iki AMQP header'ını gönderir. <code>replyTo</code>, sunucunun yanıtı nereye göndereceğini belirtir (istemcinin özel kuyruğu). <code>sessionId</code>, login sonrası gönderilir; sunucu bu ID ile mevcut <code>ClientSession</code>'ı bulur.</div>
+</div>
+
+<!-- MQBroker -->
+<div class="class-card" id="MQBroker">
+  <div class="class-header">
+    <div class="class-icon">B</div>
+    <div class="class-title">
+      <h2>MQBroker</h2>
+      <div class="subtitle"><span class="tag mq">mq</span> &nbsp; Sunucu taraflı AMQP bağlantı yöneticisi — statik topoloji bildirimi ve gönderim yardımcıları</div>
+    </div>
+  </div>
+
+  <h3>Görev</h3>
+  <p>Sunucu başlarken RabbitMQ broker'ına bağlanır, <code>paint.server</code> kuyruğunu ve <code>paint.global</code> exchange'ini bildirir. Gönderim (send/broadcast) yardımcıları thread-safe'dir; RabbitMQ Java istemcisinin <code>Channel</code>'ı thread-safe olmadığından tüm <code>basicPublish</code> çağrıları <code>synchronized</code> ile korunur.</p>
+
+  <h3>connect() — Topoloji Bildirimi</h3>
+<pre>
+<span class="kw">public void</span> <span class="nm">connect</span>() <span class="kw">throws</span> <span class="tp">IOException</span>, <span class="tp">TimeoutException</span> {
+    <span class="tp">ConnectionFactory</span> factory = <span class="kw">new</span> <span class="tp">ConnectionFactory</span>();
+    factory.setHost(host); factory.setPort(port);
+    factory.setAutomaticRecoveryEnabled(<span class="kw">true</span>); <span class="cm">// ağ kesilmesinde otomatik yeniden bağlanır</span>
+
+    connection = factory.newConnection(<span class="st">"MultiUserPaint-Server"</span>);
+    channel    = connection.createChannel();
+
+    <span class="cm">// Sunucuya gelen tüm mesajlar için sabit kuyruk</span>
+    channel.queueDeclare(<span class="tp">MQConfig</span>.SERVER_QUEUE,
+        <span class="cm">/*durable*/</span> <span class="kw">false</span>, <span class="cm">/*exclusive*/</span> <span class="kw">false</span>, <span class="cm">/*autoDelete*/</span> <span class="kw">false</span>, <span class="kw">null</span>);
+
+    <span class="cm">// Küresel fanout exchange: USER_JOIN / USER_LEAVE / FILE_LIST_RESP</span>
+    channel.exchangeDeclare(<span class="tp">MQConfig</span>.EXCHANGE_GLOBAL,
+        <span class="tp">BuiltinExchangeType</span>.FANOUT, <span class="kw">false</span>, <span class="kw">false</span>, <span class="kw">null</span>);
+}
+</pre>
+
+  <h3>Gönderim Yardımcıları</h3>
+<pre>
+<span class="cm">// Tek bir istemciye (LOGIN_OK, FILE_OPEN_DATA, …) — doğrudan kuyruğuna yaz</span>
+<span class="kw">public synchronized void</span> <span class="nm">sendToClient</span>(<span class="tp">String</span> replyTo, <span class="kw">byte</span>[] frame) {
+    channel.basicPublish(<span class="st">""</span>, replyTo, <span class="kw">null</span>, frame); <span class="cm">// default exchange, routing key = kuyruk adı</span>
+}
+
+<span class="cm">// Tüm istemcilere (USER_JOIN, USER_LEAVE) — global fanout exchange</span>
+<span class="kw">public synchronized void</span> <span class="nm">broadcastGlobal</span>(<span class="kw">byte</span>[] frame) {
+    channel.basicPublish(<span class="tp">MQConfig</span>.EXCHANGE_GLOBAL, <span class="st">""</span>, <span class="kw">null</span>, frame);
+}
+
+<span class="cm">// Dosya izleyicilerine (DRAW_BROADCAST, CANVAS_UPDATE) — per-file fanout exchange</span>
+<span class="kw">public synchronized void</span> <span class="nm">broadcastToFile</span>(<span class="kw">int</span> fileId, <span class="kw">byte</span>[] frame) {
+    <span class="tp">String</span> exchange = <span class="tp">MQConfig</span>.fileExchange(fileId);
+    ensureFileExchange(exchange); <span class="cm">// ilk kullanımda lazy bildirimi</span>
+    channel.basicPublish(exchange, <span class="st">""</span>, <span class="kw">null</span>, frame);
+}
+
+<span class="cm">// Per-file exchange'i lazy bildirim (autoDelete=true: tüm bağlantılar kopunca silinir)</span>
+<span class="kw">public synchronized void</span> <span class="nm">ensureFileExchange</span>(<span class="tp">String</span> exchange) <span class="kw">throws</span> <span class="tp">IOException</span> {
+    <span class="kw">if</span> (declaredExchanges.add(exchange)) {
+        channel.exchangeDeclare(exchange, <span class="tp">BuiltinExchangeType</span>.FANOUT,
+            <span class="cm">/*durable*/</span> <span class="kw">false</span>, <span class="cm">/*autoDelete*/</span> <span class="kw">true</span>, <span class="kw">null</span>);
+    }
+}
+</pre>
+
+  <div class="note"><strong>Thread Safety:</strong> RabbitMQ Java istemci belgesi, <code>Channel</code>'ın thread-safe olmadığını açıkça belirtir. Bu yüzden tüm <code>basicPublish</code> çağrıları <code>synchronized(this)</code> ile korunur. <code>declaredExchanges</code> ise <code>ConcurrentHashMap.newKeySet()</code> ile thread-safe set'tir; <code>add()</code> hem ekler hem de "yeni mi?" sorusunu atomik olarak yanıtlar.</div>
+</div>
+
+<!-- MQServerTransport -->
+<div class="class-card" id="MQServerTransport">
+  <div class="class-header">
+    <div class="class-icon">T</div>
+    <div class="class-title">
+      <h2>MQServerTransport</h2>
+      <div class="subtitle"><span class="tag mq">mq</span> &nbsp; NIOSelector'ın MQ karşılığı — paint.server kuyruğunu tüketir, mesajları dispatcher'a iletir</div>
+    </div>
+  </div>
+
+  <h3>Görev</h3>
+  <p><code>NIOSelector</code>'ın tüm sorumluluklarını MQ ortamında üstlenir: mesaj alma, oturum yönetimi, keepalive kontrolü. Gelen her AMQP mesajından <code>sessionId</code> ve <code>replyTo</code> header'larını okur, uygun <code>ClientSession</code>'ı bulur veya oluşturur ve <code>MessageDispatcher.dispatch()</code>'e iletir.</p>
+
+  <h3>start() — Tüketici ve Keepalive Başlatma</h3>
+<pre>
+<span class="kw">public void</span> <span class="nm">start</span>() <span class="kw">throws</span> <span class="tp">IOException</span> {
+    running = <span class="kw">true</span>;
+    <span class="tp">Channel</span> channel = broker.getChannel();
+
+    <span class="cm">// Sıra: aynı anda yalnızca 1 mesaj işle (basit sıralama garantisi)</span>
+    channel.basicQos(<span class="cn">1</span>);
+
+    channel.basicConsume(<span class="tp">MQConfig</span>.SERVER_QUEUE, <span class="cm">/*autoAck*/</span> <span class="kw">false</span>,
+        <span class="kw">new</span> <span class="tp">DefaultConsumer</span>(channel) {
+            <span class="kw">public void</span> <span class="nm">handleDelivery</span>(...) {
+                <span class="kw">try</span> {
+                    processDelivery(props, body);
+                    channel.basicAck(tag, <span class="kw">false</span>);    <span class="cm">// başarıyla işlendi</span>
+                } <span class="kw">catch</span> (<span class="tp">Exception</span> e) {
+                    channel.basicNack(tag, <span class="kw">false</span>, <span class="cm">/*requeue*/</span> <span class="kw">false</span>); <span class="cm">// hata → at</span>
+                }
+            }
+        });
+
+    <span class="cm">// 30s'de bir keepalive kontrolü (NIOSelector'daki select(1000) döngüsüyle aynı amaç)</span>
+    keepaliveScheduler.scheduleAtFixedRate(this::checkKeepaliveTimeouts,
+        <span class="tp">ProtocolConstants</span>.PING_INTERVAL_SECONDS,
+        <span class="tp">ProtocolConstants</span>.PING_INTERVAL_SECONDS,
+        <span class="tp">TimeUnit</span>.SECONDS);
+}
+</pre>
+
+  <h3>processDelivery() — Header'dan Oturum Çözümleme</h3>
+<pre>
+<span class="kw">private void</span> <span class="nm">processDelivery</span>(<span class="tp">AMQP.BasicProperties</span> props, <span class="kw">byte</span>[] body) {
+    <span class="tp">Map</span>&lt;<span class="tp">String</span>, <span class="tp">Object</span>&gt; headers = props.getHeaders();
+
+    <span class="cm">// replyTo: bu mesajın yanıtı nereye gidecek?</span>
+    <span class="tp">String</span> replyTo = headers.get(<span class="tp">MQConfig</span>.HDR_REPLY_TO).toString();
+
+    <span class="cm">// sessionId: login sonrası gönderilir; yoksa pre-login session</span>
+    <span class="tp">Integer</span> sessionId = (<span class="tp">Number</span>) headers.get(<span class="tp">MQConfig</span>.HDR_SESSION_ID);
+
+    <span class="tp">Message</span>       msg     = decodeFrame(body);     <span class="cm">// wire-format → Message</span>
+    <span class="tp">ClientSession</span> session = resolveSession(sessionId, replyTo);
+
+    session.updatePingTime();                       <span class="cm">// her mesaj canlı kalma kanıtı</span>
+    <span class="kw">boolean</span> keepOpen = dispatcher.dispatch(session, msg);
+    <span class="kw">if</span> (!keepOpen) evictSession(session);
+}
+</pre>
+
+  <h3>resolveSession() — Oturum Bulma veya Oluşturma</h3>
+<pre>
+<span class="kw">private</span> <span class="tp">ClientSession</span> <span class="nm">resolveSession</span>(<span class="tp">Integer</span> sessionId, <span class="tp">String</span> replyTo) {
+    <span class="kw">if</span> (sessionId != <span class="kw">null</span>) {
+        <span class="tp">ClientSession</span> existing = registry.getBySessionId(sessionId);
+        <span class="kw">if</span> (existing != <span class="kw">null</span>) {
+            <span class="cm">// Yeniden bağlanan istemci: replyTo değişmiş olabilir</span>
+            <span class="kw">if</span> (!replyTo.equals(existing.getMqReplyTo())) {
+                existing.setMqReplyTo(replyTo);
+                existing.setMqSink(buildSink(replyTo));
+            }
+            <span class="kw">return</span> existing;
+        }
+    }
+    <span class="cm">// Yeni pre-login oturum oluştur</span>
+    <span class="kw">int</span> newId = sessionIdCounter.getAndIncrement();
+    <span class="tp">ClientSession</span> session = <span class="kw">new</span> <span class="tp">ClientSession</span>(newId, replyTo);
+    session.setMqSink(buildSink(replyTo)); <span class="cm">// outbound sink bağla</span>
+    registry.register(session);
+    <span class="kw">return</span> session;
+}
+
+<span class="cm">// Sink: broker.sendToClient(replyTo, frame) çağrısını lambda'ya sarar</span>
+<span class="kw">private</span> <span class="tp">Consumer</span>&lt;<span class="kw">byte</span>[]&gt; <span class="nm">buildSink</span>(<span class="tp">String</span> replyTo) {
+    <span class="kw">return</span> frame -&gt; broker.sendToClient(replyTo, frame);
+}
+</pre>
+
+  <div class="info"><strong>basicQos(1) neden?</strong> Sunucu her seferinde yalnızca 1 mesajı işler; ACK gelene kadar sonraki teslim edilmez. Bu, mesaj sırasını garanti eder ve aşırı yüklenmeye karşı basit bir arka-basınç (back-pressure) mekanizması sağlar.</div>
+  <div class="note"><strong>NIOSelector ile karşılaştırma:</strong> NIOSelector'da <code>select(1000)</code> döngüsü keepalive'ı kontrol ediyordu. MQServerTransport'ta bu görev ayrı bir <code>ScheduledExecutorService</code> thread'ine taşındı. Frame birleştirme (MessageFramer) ise gerekmiyor; AMQP mesaj sınırlarını kendisi yönetir.</div>
+</div>
+
+<!-- MQNetworkReader -->
+<div class="class-card" id="MQNetworkReader">
+  <div class="class-header">
+    <div class="class-icon">R</div>
+    <div class="class-title">
+      <h2>MQNetworkReader</h2>
+      <div class="subtitle"><span class="tag mq">mq</span> <span class="tag client">client</span> &nbsp; İstemci taraflı AMQP tüketicisi — mesajları Swing EDT'de teslim eder</div>
+    </div>
+  </div>
+
+  <h3>Görev</h3>
+  <p><code>NetworkReader</code>'ın MQ karşılığıdır. İstemcinin özel kuyruğunu dinler, gelen her mesajı wire-format'tan <code>Message</code>'a çevirir ve Swing EDT'de teslim eder. Ayrıca dosya açma/kapama olaylarında per-file fanout exchange'e bağlanır/ayrılır.</p>
+
+  <h3>start() — Kuyruk Bildirimi ve Tüketici</h3>
+<pre>
+<span class="kw">public void</span> <span class="nm">start</span>(<span class="tp">Channel</span> channel, <span class="tp">String</span> clientQueueName) <span class="kw">throws</span> <span class="tp">IOException</span> {
+    <span class="cm">// Exclusive + autoDelete: bu istemci bağlantısı kapanınca kuyruk silinir</span>
+    channel.queueDeclare(clientQueueName,
+        <span class="cm">/*durable*/</span> <span class="kw">false</span>, <span class="cm">/*exclusive*/</span> <span class="kw">true</span>, <span class="cm">/*autoDelete*/</span> <span class="kw">true</span>, <span class="kw">null</span>);
+
+    <span class="cm">// Global fanout exchange'e bağlan: USER_JOIN/LEAVE, FILE_LIST_RESP alınır</span>
+    channel.exchangeDeclare(<span class="tp">MQConfig</span>.EXCHANGE_GLOBAL, <span class="tp">BuiltinExchangeType</span>.FANOUT, ...);
+    channel.queueBind(clientQueueName, <span class="tp">MQConfig</span>.EXCHANGE_GLOBAL, <span class="st">""</span>);
+
+    <span class="cm">// autoAck=true: istemci side'da manuel ACK gerekmiyor</span>
+    consumerTag = channel.basicConsume(clientQueueName, <span class="cm">/*autoAck*/</span> <span class="kw">true</span>,
+        <span class="kw">new</span> <span class="tp">DefaultConsumer</span>(channel) {
+            <span class="kw">public void</span> <span class="nm">handleDelivery</span>(...) {
+                <span class="tp">Message</span> msg = decodeFrame(body);
+                <span class="tp">SwingUtilities</span>.invokeLater(() -&gt; onMessage.accept(msg)); <span class="cm">// EDT'de teslim</span>
+            }
+            <span class="kw">public void</span> <span class="nm">handleShutdownSignal</span>(...) {
+                <span class="tp">SwingUtilities</span>.invokeLater(onDisconnect); <span class="cm">// bağlantı koptu</span>
+            }
+        });
+}
+</pre>
+
+  <h3>File Exchange Bağlama / Ayrılma</h3>
+<pre>
+<span class="cm">// ConnectionManager.notifyFileOpened() → burası çağrılır</span>
+<span class="kw">public void</span> <span class="nm">bindToFileExchange</span>(<span class="kw">int</span> fileId) {
+    <span class="tp">String</span> exchange = <span class="tp">MQConfig</span>.fileExchange(fileId);
+    channel.exchangeDeclare(exchange, <span class="tp">BuiltinExchangeType</span>.FANOUT,
+        <span class="kw">false</span>, <span class="cm">/*autoDelete*/</span> <span class="kw">true</span>, <span class="kw">null</span>);
+    channel.queueBind(clientQueueName, exchange, <span class="st">""</span>);
+    <span class="cm">// Artık bu dosyanın DRAW_BROADCAST ve CANVAS_UPDATE mesajları gelir</span>
+}
+
+<span class="kw">public void</span> <span class="nm">unbindFromFileExchange</span>(<span class="kw">int</span> fileId) {
+    channel.queueUnbind(clientQueueName, <span class="tp">MQConfig</span>.fileExchange(fileId), <span class="st">""</span>);
+    <span class="cm">// Dosya kapatıldı; ilgili mesajlar artık gelmez</span>
+}
+</pre>
+
+  <div class="note"><strong>NetworkReader ile fark:</strong> Eski <code>NetworkReader</code> bir daemon thread'de sürekli <code>dis.readByte()</code> yapıyordu. <code>MQNetworkReader</code>'da bunun yerine AMQP tüketici callback'i kullanılır; RabbitMQ Java istemcisi ayrı bir thread'de dinlemeyi yönetir. Sonuç aynıdır: mesaj EDT'ye <code>invokeLater()</code> ile iletilir.</div>
+</div>
+
+<!-- MQNetworkWriter -->
+<div class="class-card" id="MQNetworkWriter">
+  <div class="class-header">
+    <div class="class-icon">W</div>
+    <div class="class-title">
+      <h2>MQNetworkWriter</h2>
+      <div class="subtitle"><span class="tag mq">mq</span> <span class="tag client">client</span> &nbsp; İstemci taraflı AMQP yayıncısı — her mesaja sessionId ve replyTo header'ı ekler</div>
+    </div>
+  </div>
+
+  <h3>Görev</h3>
+  <p><code>NetworkWriter</code>'ın MQ karşılığıdır. Thread-safe <code>send(byte[])</code> metoduyla mesajları dahili kuyruğa ekler; daemon thread bunları <code>paint.server</code> kuyruğuna AMQP header'larıyla yayınlar.</p>
+
+<pre>
+<span class="kw">private final</span> <span class="tp">BlockingQueue</span>&lt;<span class="kw">byte</span>[]&gt; writeQueue = <span class="kw">new</span> <span class="tp">LinkedBlockingQueue</span>&lt;&gt;();
+<span class="kw">private volatile boolean</span> running = <span class="kw">false</span>;
+<span class="kw">private int</span> sessionId = -<span class="cn">1</span>; <span class="cm">// -1 = henüz login olmadı</span>
+</pre>
+
+  <h3>publish() — Header Ekleme</h3>
+<pre>
+<span class="kw">private void</span> <span class="nm">publish</span>(<span class="kw">byte</span>[] frame) <span class="kw">throws</span> <span class="tp">IOException</span> {
+    <span class="tp">Map</span>&lt;<span class="tp">String</span>, <span class="tp">Object</span>&gt; headers = <span class="kw">new</span> <span class="tp">HashMap</span>&lt;&gt;();
+    headers.put(<span class="tp">MQConfig</span>.HDR_REPLY_TO, clientQueueName); <span class="cm">// her mesajda gönderilir</span>
+    <span class="kw">if</span> (sessionId &gt;= <span class="cn">0</span>) {
+        headers.put(<span class="tp">MQConfig</span>.HDR_SESSION_ID, sessionId); <span class="cm">// login sonrası eklenir</span>
+    }
+
+    <span class="tp">AMQP.BasicProperties</span> props = <span class="kw">new</span> <span class="tp">AMQP.BasicProperties.Builder</span>()
+        .headers(headers).build();
+
+    <span class="cm">// Varsayılan exchange'e yayınla; routing key = kuyruk adı</span>
+    channel.basicPublish(<span class="st">""</span>, <span class="tp">MQConfig</span>.SERVER_QUEUE, props, frame);
+}
+</pre>
+
+  <h3>setSessionId() — LOGIN_OK Sonrası</h3>
+<pre>
+<span class="cm">// ConnectionManager.onLoginOk() → mqWriter.setSessionId() çağrısı yapar</span>
+<span class="kw">public void</span> <span class="nm">setSessionId</span>(<span class="kw">int</span> id) { <span class="kw">this</span>.sessionId = id; }
+
+<span class="cm">// run() → writeQueue.take() döngüsü (NetworkWriter ile özdeş)</span>
+<span class="kw">public void</span> <span class="nm">run</span>() {
+    <span class="kw">while</span> (running) {
+        <span class="kw">byte</span>[] frame = writeQueue.take(); <span class="cm">// kuyruk boşsa bekle</span>
+        publish(frame);
+    }
+}
+</pre>
+
+  <div class="ok"><strong>NetworkWriter ile karşılaştırma:</strong> Her ikisi de <code>BlockingQueue</code> + daemon thread kalıbını kullanır. Fark: <code>NetworkWriter</code> veriyi <code>OutputStream.write()</code>'a yazar. <code>MQNetworkWriter</code> ise AMQP header'ları ekleyerek <code>channel.basicPublish()</code>'e yazar. Bu sayede sunucu her mesajın sahibini ve nereye yanıt göndereceğini header'dan okuyabilir.</div>
 </div>
 
 <div class="divider"></div>

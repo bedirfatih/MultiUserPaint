@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="MultiUserPaint" default="jar" basedir=".">
+
+    <!-- ── Properties ─────────────────────────────────────────────────────── -->
+    <property name="src.dir"        value="src"/>
+    <property name="build.dir"      value="build"/>
+    <property name="classes.dir"    value="${build.dir}/classes"/>
+    <property name="dist.dir"       value="dist"/>
+    <property name="lib.dir"        value="lib"/>
+
+    <path id="compile.classpath">
+        <fileset dir="${lib.dir}" includes="*.jar"/>
+    </path>
+
+    <!-- ── Targets ────────────────────────────────────────────────────────── -->
+
+    <target name="init">
+        <mkdir dir="${classes.dir}"/>
+        <mkdir dir="${dist.dir}"/>
+    </target>
+
+    <target name="compile" depends="init">
+        <javac srcdir="${src.dir}"
+               destdir="${classes.dir}"
+               includeantruntime="false"
+               source="8" target="8"
+               encoding="UTF-8">
+            <classpath refid="compile.classpath"/>
+        </javac>
+    </target>
+
+    <!-- Client JAR (fat) ──────────────────────────────────────────────────── -->
+    <target name="jar-client" depends="compile">
+        <jar destfile="${dist.dir}/MultiUserPaint.jar"
+             manifest="manifest.mf">
+            <fileset dir="${classes.dir}"/>
+            <zipfileset src="${lib.dir}/amqp-client-5.21.0.jar"   excludes="META-INF/*.SF,META-INF/*.DSA,META-INF/*.RSA"/>
+            <zipfileset src="${lib.dir}/slf4j-api-1.7.36.jar"     excludes="META-INF/*.SF,META-INF/*.DSA,META-INF/*.RSA"/>
+            <zipfileset src="${lib.dir}/slf4j-simple-1.7.36.jar"  excludes="META-INF/*.SF,META-INF/*.DSA,META-INF/*.RSA"/>
+        </jar>
+        <echo>Client JAR: ${dist.dir}/MultiUserPaint.jar</echo>
+    </target>
+
+    <!-- Server JAR (fat) ──────────────────────────────────────────────────── -->
+    <target name="jar-server" depends="compile">
+        <jar destfile="${dist.dir}/MultiUserPaintServer.jar"
+             manifest="manifest-server.mf">
+            <fileset dir="${classes.dir}"/>
+            <zipfileset src="${lib.dir}/amqp-client-5.21.0.jar"   excludes="META-INF/*.SF,META-INF/*.DSA,META-INF/*.RSA"/>
+            <zipfileset src="${lib.dir}/slf4j-api-1.7.36.jar"     excludes="META-INF/*.SF,META-INF/*.DSA,META-INF/*.RSA"/>
+            <zipfileset src="${lib.dir}/slf4j-simple-1.7.36.jar"  excludes="META-INF/*.SF,META-INF/*.DSA,META-INF/*.RSA"/>
+        </jar>
+        <echo>Server JAR: ${dist.dir}/MultiUserPaintServer.jar</echo>
+    </target>
+
+    <target name="jar" depends="jar-client,jar-server"
+            description="Build both client and server fat JARs"/>
+
+    <target name="clean" description="Remove build artefacts">
+        <delete dir="${build.dir}"/>
+        <delete dir="${dist.dir}"/>
+    </target>
+
+</project>

@@ -2,9 +2,9 @@ package multiuserpaint.server;
 
 import multiuserpaint.common.*;
 import multiuserpaint.server.handlers.*;
+import multiuserpaint.server.store.SessionRegistry;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -19,13 +19,16 @@ public class MessageDispatcher {
     private final FileHandler fileHandler;
     private final DrawHandler drawHandler;
     private final ClipboardHandler clipboardHandler;
+    private final SessionRegistry registry;
 
     public MessageDispatcher(LoginHandler loginHandler, FileHandler fileHandler,
-                             DrawHandler drawHandler, ClipboardHandler clipboardHandler) {
+                             DrawHandler drawHandler, ClipboardHandler clipboardHandler,
+                             SessionRegistry registry) {
         this.loginHandler = loginHandler;
-        this.fileHandler = fileHandler;
-        this.drawHandler = drawHandler;
+        this.fileHandler  = fileHandler;
+        this.drawHandler  = drawHandler;
         this.clipboardHandler = clipboardHandler;
+        this.registry     = registry;
     }
 
     /**
@@ -107,10 +110,8 @@ public class MessageDispatcher {
 
             // User list
             case USER_LIST_REQ:
-                // Handled inline — small enough
                 enqueue(session, MessageEncoder.encodeUserListResp(
-                    // registry access via handler would be cleaner; direct for simplicity
-                    new java.util.ArrayList<>()
+                    registry.getAllUsernames()
                 ));
                 break;
 
@@ -129,6 +130,6 @@ public class MessageDispatcher {
     }
 
     private void enqueue(ClientSession session, byte[] data) {
-        session.writeQueue.offer(ByteBuffer.wrap(data));
+        session.enqueue(data);
     }
 }

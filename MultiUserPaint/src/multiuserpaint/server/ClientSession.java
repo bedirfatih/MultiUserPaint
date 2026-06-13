@@ -8,6 +8,7 @@ import java.nio.channels.SocketChannel;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.Consumer;
 
 /**
  * Holds all state for one connected client.
@@ -16,10 +17,23 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * small read buffer:
  *   Phase 1: accumulate HEADER_SIZE bytes in headerBuf
  *   Phase 2: once payload length is known, allocate payloadBuf and fill it
+ *
+ * In MQ mode: channel is null; mqReplyTo holds the client's reply queue name;
+ * mqSink replaces writeQueue for outbound data.
  */
 public class ClientSession {
     private final int sessionId;
-    private final SocketChannel channel;
+    private final SocketChannel channel;  // null in MQ mode
+
+    /** MQ mode: the client's exclusive reply-queue name. */
+    private String mqReplyTo;
+
+    /**
+     * Pluggable outbound sink.
+     * Socket mode default: adds to writeQueue.
+     * MQ mode: set by MQServerTransport to publish via broker.
+     */
+    private Consumer<byte[]> mqSink = null;
 
     private FSMState state = FSMState.HANDSHAKE;
     private String username = null;
@@ -53,6 +67,13 @@ public class ClientSession {
         this.channel = channel;
     }
 
+    /** MQ-mode constructor: no NIO channel. */
+    public ClientSession(int sessionId, String mqReplyTo) {
+        this.sessionId = sessionId;
+        this.channel = null;
+        this.mqReplyTo = mqReplyTo;
+    }
+
     // -------------------------------------------------------------------------
     // FSM
     // -------------------------------------------------------------------------
@@ -73,6 +94,29 @@ public class ClientSession {
     public SocketChannel getChannel() { return channel; }
     public String getUsername()       { return username; }
     public void setUsername(String u) { this.username = u; }
+
+    public String getMqReplyTo()         { return mqReplyTo; }
+    public void   setMqReplyTo(String q) { this.mqReplyTo = q; }
+
+    /**
+     * Set the outbound sink used in MQ mode.
+     * The sink receives a fully-encoded wire-format frame and delivers it
+     * to the client (e.g. via AMQP basicPublish).
+     */
+    public void setMqSink(Consumer<byte[]> sink) { this.mqSink = sink; }
+
+    /**
+     * Unified outbound dispatch.
+     * Socket mode: adds frame to writeQueue (NIOSelector drains it).
+     * MQ mode: delegates immediately to the installed mqSink.
+     */
+    public void enqueue(byte[] data) {
+        if (mqSink != null) {
+            mqSink.accept(data);
+        } else {
+            writeQueue.offer(ByteBuffer.wrap(data));
+        }
+    }
 
     // -------------------------------------------------------------------------
     // Open files

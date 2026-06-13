@@ -1,0 +1,180 @@
+========================================================================
+MultiUserPaint – Proje Bilgileri ve Calistirma Adımlari
+========================================================================
+
+------------------------------------------------------------------------
+1. GEREKSINIMLER
+------------------------------------------------------------------------
+- Java 8 veya uzeri (JDK 8+)
+- RabbitMQ 3.x veya 4.x (MQ modunda)
+  https://www.rabbitmq.com/download.html
+- RabbitMQ Java Client JAR'lari (lib/ klasorune yerlestirilmeli):
+    amqp-client-5.21.0.jar
+    slf4j-api-1.7.36.jar
+    slf4j-simple-1.7.36.jar
+  Indirme: https://www.rabbitmq.com/java-client.html
+           veya Maven Central'dan
+
+------------------------------------------------------------------------
+2. RabbitMQ BROKER KURULUMU
+------------------------------------------------------------------------
+Windows:
+  1. RabbitMQ indirip kurun (Erlang/OTP kurulu olmali)
+  2. Baslat: rabbitmq-server start   (ya da Services'ten)
+  3. Yonetim arayuzu (opsiyonel):
+       rabbitmq-plugins enable rabbitmq_management
+       Tarayici: http://localhost:15672  (kullanici: guest / guest)
+
+Linux / macOS:
+  sudo apt-get install rabbitmq-server     (Debian/Ubuntu)
+  brew install rabbitmq                    (macOS)
+  sudo systemctl start rabbitmq-server
+
+Varsayilan baglanti:
+  Host: localhost   Port: 5672   Kullanici: guest   Sifre: guest
+
+------------------------------------------------------------------------
+3. JAR DOSYALARINI INDIRME
+------------------------------------------------------------------------
+Asagidaki JAR dosyalarini MultiUserPaint/MultiUserPaint/lib/ klasorune
+kopyalayin:
+
+  amqp-client-5.21.0.jar
+    -> https://repo1.maven.org/maven2/com/rabbitmq/amqp-client/5.21.0/amqp-client-5.21.0.jar
+
+  slf4j-api-1.7.36.jar
+    -> https://repo1.maven.org/maven2/org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.jar
+
+  slf4j-simple-1.7.36.jar
+    -> https://repo1.maven.org/maven2/org/slf4j/slf4j-simple/1.7.36/slf4j-simple-1.7.36.jar
+
+------------------------------------------------------------------------
+4. DERLEME (NetBeans)
+------------------------------------------------------------------------
+1. Projeyi NetBeans ile acin: MultiUserPaint/MultiUserPaint/
+2. lib/ klasorundeki JAR'lari proje kutuphanesine ekleyin:
+   Project Properties -> Libraries -> Add JAR/Folder
+   (amqp-client, slf4j-api, slf4j-simple)
+3. Build -> Clean and Build (Shift+F11)
+   Cikti: dist/MultiUserPaint.jar ve dist/MultiUserPaintServer.jar
+
+Komut satirindan derleme:
+  cd MultiUserPaint/MultiUserPaint
+  ant jar
+
+------------------------------------------------------------------------
+5. SUNUCU CALISTIRMA
+------------------------------------------------------------------------
+-- Socket modu (orijinal TCP/NIO) --
+  java -jar dist/MultiUserPaintServer.jar
+  java -jar dist/MultiUserPaintServer.jar 9090
+  java -jar dist/MultiUserPaintServer.jar 9090 files
+
+-- MQ modu (RabbitMQ) --
+  java -jar dist/MultiUserPaintServer.jar --mq
+  java -jar dist/MultiUserPaintServer.jar --mq localhost
+  java -jar dist/MultiUserPaintServer.jar --mq 192.168.1.5 files
+
+Parametre sirasi (MQ modu): --mq [brokerHost] [filesDizini]
+Varsayilan brokerHost: localhost
+Varsayilan filesDizini: files
+
+------------------------------------------------------------------------
+6. ISTEMCI CALISTIRMA
+------------------------------------------------------------------------
+  java -jar dist/MultiUserPaint.jar
+
+  Login diyalogunda:
+  - Kullanici adi: 3-16 karakter, [a-zA-Z0-9_]
+  - Host: sunucunun IP adresi veya "localhost"
+  - Port: 9090 (socket modu) veya 5672 (MQ modu)
+  - Mod secimi: diyalogdaki "Baglanti Modu" seceneginden
+
+  Not: MQ modunda port 5672 (RabbitMQ AMQP portu) kullanilir;
+       sunucu --mq bayragi ile baslatilmis olmalidir.
+
+------------------------------------------------------------------------
+7. TEST SENARYOLARI
+------------------------------------------------------------------------
+Senaryo 1 – 3 istemci, ayni dosyada cizim:
+  1. Sunucuyu baslatin (--mq veya socket)
+  2. 3 ayri istemci baslatin, her biri farkli kullanici adiyla giris yapsin
+  3. Hepsi ayni dosyayi acsin
+  4. Birinin cizimi diger ikisinde gozukmeli
+
+Senaryo 2 – Dosya izolasyonu:
+  1. Istemci A, Dosya 1'i acsin; Istemci B, Dosya 2'yi acsin
+  2. A'nin cizimleri B'ye gitmemeli; B'ninki A'ya gitmemeli
+
+Senaryo 3 – Clipboard:
+  1. Bir istemci bolge sec -> Copy
+  2. Ayni dosyada baska istemci -> Paste
+  3. Paste tum goruculere yayinlanmali
+
+Senaryo 4 – Otomatik kaydetme:
+  1. Dosya ac, cizim yap
+  2. 60 saniye bekle -> AUTOSAVE_NOTIFY bildirimi gelmeli
+  3. Istemciyi kapat, yeniden baglan, dosyayi ac -> cizimler korunmali
+
+Senaryo 5 – Broker kapat/ac (MQ modu):
+  1. 2 istemci bagli, cizim yapiliyor
+  2. RabbitMQ'yu durdur -> istemciler hata mesaji almali
+  3. RabbitMQ'yu yeniden baslat -> otomatik yeniden baglanti
+     (amqp-client automatic recovery etkin)
+
+------------------------------------------------------------------------
+8. KULLANICI LISTESI DUZELTMESI
+------------------------------------------------------------------------
+Orijinal kodda USER_LIST_RESP bos liste donuyordu.
+Duzeltme: MessageDispatcher artik SessionRegistry.getAllUsernames()
+kullanarak aktif kullanicilari listeler.
+
+------------------------------------------------------------------------
+9. PROJE YAPISI
+------------------------------------------------------------------------
+src/multiuserpaint/
+  mq/
+    MQConfig.java            -- RabbitMQ topoloji sabitleri
+  server/
+    PaintServer.java         -- Giris noktasi (--mq bayragi ile MQ modu)
+    ClientSession.java       -- Oturum durumu; enqueue() soyutlamasi
+    MessageDispatcher.java   -- FSM tabanli mesaj yonlendirici
+    MessageFramer.java       -- Socket modu cerceve birlestiricisi
+    NIOSelector.java         -- Socket modu NIO event loop
+    store/
+      SessionRegistry.java   -- Oturum kaydi; MQBroker enjeksiyonu
+      FileStore.java         -- Disk I/O
+      AutoSaveScheduler.java -- Periyodik otomatik kaydetme
+    handlers/
+      LoginHandler.java
+      FileHandler.java
+      DrawHandler.java
+      ClipboardHandler.java
+    mq/
+      MQBroker.java           -- Sunucu AMQP baglantisi
+      MQServerTransport.java  -- paint.server kuyrugundan tuketici
+  client/
+    PaintClient.java          -- Giris noktasi
+    network/
+      ConnectionManager.java  -- Socket + MQ transport secici
+      NetworkReader.java       -- Socket modu okuyucu thread
+      NetworkWriter.java       -- Socket modu yazici thread
+      MQNetworkReader.java     -- MQ modu AMQP tuketici
+      MQNetworkWriter.java     -- MQ modu AMQP yayinci
+    gui/
+      MainFrame.java / CanvasPanel.java / ...
+
+lib/
+  amqp-client-5.21.0.jar
+  slf4j-api-1.7.36.jar
+  slf4j-simple-1.7.36.jar
+
+------------------------------------------------------------------------
+10. BILINEN SINIRLAMALAR (MINIMUM TESLIM)
+------------------------------------------------------------------------
+- Socket modunda USER_JOIN global fanout yerine NIO writeQueue kullanilir;
+  MQ modunda paint.global exchange uzerinden gonder.
+- Benchmark ve performans olcumleri kapsam disinda.
+- Ileri observability (Prometheus, Grafana) kapsam disinda.
+- UI yeniden tasarim kapsam disinda.
+========================================================================
