@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MultiUserPaint — Çalıştırma ve Test Kılavuzu</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11pt; color: #1a1a1a;
+         background: #f4f6fb; padding: 0; line-height: 1.7; }
+  .sidebar {
+    position: fixed; left: 0; top: 0; width: 260px; height: 100vh;
+    background: #1a3c6e; color: #cde; overflow-y: auto; padding: 20px 0;
+  }
+  .sidebar h2 { color: #fff; font-size: 10pt; text-transform: uppercase;
+                letter-spacing: 1px; padding: 8px 18px; margin-top: 14px;
+                border-top: 1px solid #2a5298; }
+  .sidebar a { display: block; color: #b0d0f0; text-decoration: none;
+               padding: 5px 18px; font-size: 9.5pt; }
+  .sidebar a:hover { background: #2a5298; color: #fff; }
+  .sidebar .logo { color: #fff; font-size: 14pt; font-weight: bold;
+                   padding: 14px 18px 8px; border-bottom: 1px solid #2a5298; }
+  .sidebar .logo span { font-size: 9pt; color: #89aacc; display: block; }
+  main { margin-left: 260px; padding: 40px 50px; max-width: 1100px; }
+  h1 { font-size: 20pt; color: #1a3c6e; border-bottom: 3px solid #1a3c6e;
+       padding-bottom: 8px; margin-bottom: 24px; }
+  h2 { font-size: 15pt; color: #1a3c6e; margin-top: 50px; margin-bottom: 4px;
+       border-left: 5px solid #1a3c6e; padding-left: 12px; }
+  h3 { font-size: 12pt; color: #2a5298; margin-top: 28px; margin-bottom: 8px; }
+  p  { margin-bottom: 10px; }
+  ul, ol { margin: 8px 0 12px 28px; }
+  li { margin-bottom: 6px; }
+  code {
+    font-family: 'Cascadia Code', 'Courier New', monospace;
+    font-size: 9.5pt; background: #eef3fc; border-radius: 3px; padding: 1px 6px;
+    color: #1a3c6e;
+  }
+  pre {
+    font-family: 'Cascadia Code', 'Courier New', monospace;
+    font-size: 9.5pt; background: #1e2a3a; color: #cde; border-radius: 6px;
+    padding: 18px 22px; margin: 14px 0; overflow-x: auto; line-height: 1.8;
+    border-left: 4px solid #4a9eff;
+  }
+  pre .cm   { color: #6a9955; }
+  pre .kw   { color: #569cd6; }
+  pre .st   { color: #ce9178; }
+  pre .out  { color: #4ec9b0; }
+  pre .warn { color: #f0a500; }
+  pre .err  { color: #f44747; }
+  pre .path { color: #b5cea8; }
+  .step-card {
+    background: #fff; border-radius: 8px; border: 1px solid #d0dce8;
+    padding: 28px 32px; margin-bottom: 36px;
+    box-shadow: 0 2px 8px rgba(26,60,110,0.06);
+  }
+  .step-header {
+    display: flex; align-items: flex-start; gap: 16px; margin-bottom: 18px;
+  }
+  .step-num {
+    background: #1a3c6e; color: #fff; border-radius: 50%;
+    width: 44px; height: 44px; display: flex; align-items: center;
+    justify-content: center; font-size: 16pt; font-weight: bold; flex-shrink: 0;
+  }
+  .step-title h2 { margin: 0; padding: 0; border: none; font-size: 15pt; }
+  .step-title .sub { color: #666; font-size: 10pt; margin-top: 2px; }
+  .note   { background: #fff8dc; border-left: 4px solid #f0a500; padding: 10px 14px;
+            border-radius: 2px; font-size: 10pt; margin: 14px 0; }
+  .info   { background: #e8f4fd; border-left: 4px solid #2196f3; padding: 10px 14px;
+            border-radius: 2px; font-size: 10pt; margin: 14px 0; }
+  .ok     { background: #e8f5e9; border-left: 4px solid #4caf50; padding: 10px 14px;
+            border-radius: 2px; font-size: 10pt; margin: 14px 0; }
+  .danger { background: #fdecea; border-left: 4px solid #f44336; padding: 10px 14px;
+            border-radius: 2px; font-size: 10pt; margin: 14px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 10pt; }
+  th { background: #1a3c6e; color: #fff; padding: 7px 10px; text-align: left; }
+  td { padding: 6px 10px; border: 1px solid #c8d8e8; vertical-align: top; }
+  tr:nth-child(even) td { background: #f0f5fb; }
+  .badge {
+    display: inline-block; border-radius: 4px; padding: 2px 10px;
+    font-size: 9pt; font-weight: bold; margin-right: 4px; vertical-align: middle;
+  }
+  .badge.socket { background: #1976d2; color: #fff; }
+  .badge.mq     { background: #7b1fa2; color: #fff; }
+  .badge.both   { background: #388e3c; color: #fff; }
+  .badge.win    { background: #0078d4; color: #fff; }
+  .badge.req    { background: #c62828; color: #fff; }
+  .divider { height: 2px; background: linear-gradient(90deg,#1a3c6e,#e8f0fe);
+             margin: 40px 0; border-radius: 2px; }
+  .checklist { list-style: none; margin-left: 0; }
+  .checklist li::before { content: "☐  "; font-size: 11pt; color: #1a3c6e; }
+  .checklist li.done::before { content: "☑  "; color: #4caf50; }
+  @media print { .sidebar { display: none; } main { margin-left: 0; } }
+</style>
+</head>
+<body>
+
+<!-- ====== SIDEBAR ====== -->
+<nav class="sidebar">
+  <div class="logo">MultiUserPaint<span>Çalıştırma Kılavuzu</span></div>
+
+  <h2>Hazırlık</h2>
+  <a href="#gereksinimler">Gereksinimler</a>
+  <a href="#proje-yapisi">Proje Yapısı</a>
+
+  <h2>Derleme</h2>
+  <a href="#derleme-ps">PowerShell ile Derle</a>
+  <a href="#derleme-ant">Ant ile Derle</a>
+  <a href="#derleme-netbeans">NetBeans ile Derle</a>
+
+  <h2>Socket Modu</h2>
+  <a href="#socket-sunucu">Sunucuyu Başlat</a>
+  <a href="#socket-istemci">İstemciyi Başlat</a>
+  <a href="#socket-coklu">Çoklu İstemci</a>
+
+  <h2>RabbitMQ Modu</h2>
+  <a href="#rabbitmq-kurulum">RabbitMQ Kurulumu</a>
+  <a href="#rabbitmq-dogrula">Broker Doğrulama</a>
+  <a href="#mq-sunucu">Sunucuyu Başlat (MQ)</a>
+  <a href="#mq-istemci">İstemciyi Başlat (MQ)</a>
+
+  <h2>Test Senaryoları</h2>
+  <a href="#test-login">Login Testi</a>
+  <a href="#test-cizim">Çizim Senkronizasyonu</a>
+  <a href="#test-dosya">Dosya İşlemleri</a>
+  <a href="#test-pano">Pano (Kopyala/Yapıştır)</a>
+  <a href="#test-undo">Undo Senkronizasyonu</a>
+  <a href="#test-keepalive">Keepalive Testi</a>
+
+  <h2>Sorun Giderme</h2>
+  <a href="#hata-port">Port Meşgul Hatası</a>
+  <a href="#hata-mq">RabbitMQ Bağlantı Hatası</a>
+  <a href="#hata-derleme">Derleme Hatası</a>
+</nav>
+
+<!-- ====== MAIN ====== -->
+<main>
+<h1>MultiUserPaint — Çalıştırma ve Test Kılavuzu</h1>
+<p>Bu kılavuz, projeyi sıfırdan derleyip çalıştırmak ve her iki transport modunu (<span class="badge socket">Socket</span> ve <span class="badge mq">RabbitMQ</span>) test etmek için gerekli tüm adımları içerir.</p>
+
+<!-- ============================================================ GEREKSİNİMLER -->
+<div class="divider"></div>
+<h1>BÖLÜM 1 — Hazırlık</h1>
+
+<div class="step-card" id="gereksinimler">
+  <div class="step-header">
+    <div class="step-num">!</div>
+    <div class="step-title">
+      <h2>Gereksinimler</h2>
+      <div class="sub">Kurulu olması gereken araçlar</div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Araç</th><th>Minimum Versiyon</th><th>Kullanım</th><th>Zorunlu?</th></tr>
+    <tr>
+      <td><strong>Java JDK</strong></td>
+      <td>8+ (script JDK-21 arar)</td>
+      <td>Derleme ve çalıştırma</td>
+      <td><span class="badge req">Zorunlu</span></td>
+    </tr>
+    <tr>
+      <td><strong>Apache Ant</strong></td>
+      <td>1.10+</td>
+      <td>Ant ile derleme (<code>build.xml</code>)</td>
+      <td>İsteğe bağlı</td>
+    </tr>
+    <tr>
+      <td><strong>RabbitMQ Server</strong></td>
+      <td>3.12+</td>
+      <td>MQ modu için broker</td>
+      <td><span class="badge mq">MQ Modu</span></td>
+    </tr>
+    <tr>
+      <td><strong>Erlang/OTP</strong></td>
+      <td>25+</td>
+      <td>RabbitMQ'nun bağımlılığı</td>
+      <td><span class="badge mq">MQ Modu</span></td>
+    </tr>
+  </table>
+
+  <h3>Java Versiyonunu Doğrula</h3>
+<pre>
+<span class="cm"># PowerShell veya CMD</span>
+java -version
+javac -version
+</pre>
+<pre>
+<span class="out">java version "21.0.x" 2024-xx-xx LTS
+javac 21.0.x</span>
+</pre>
+
+  <div class="info"><strong>JDK 8 ile de çalışır:</strong> <code>build.ps1</code> scripti önce <code>C:\Program Files\Java\jdk-21\bin</code> dizinine bakar; bulamazsa PATH'teki <code>javac</code>'ı kullanır. <code>-source 8 -target 8</code> ile derleme Java 8+ JVM'de çalışır.</div>
+</div>
+
+<div class="step-card" id="proje-yapisi">
+  <div class="step-header">
+    <div class="step-num">📁</div>
+    <div class="step-title">
+      <h2>Proje Yapısı</h2>
+      <div class="sub">Klasör ve dosyaların görevi</div>
+    </div>
+  </div>
+<pre>
+<span class="path">MultiUserPaint/</span>
+├── <span class="path">src/</span>                  <span class="cm"># Kaynak kodlar</span>
+│   └── multiuserpaint/
+│       ├── client/           <span class="cm"># İstemci (GUI + ağ)</span>
+│       ├── common/           <span class="cm"># Ortak protokol sınıfları</span>
+│       ├── mq/               <span class="cm"># MQConfig (topoloji sabitleri)</span>
+│       └── server/           <span class="cm"># Sunucu (NIO + MQ + handler'lar)</span>
+├── <span class="path">lib/</span>                  <span class="cm"># Bağımlılık JAR'ları</span>
+│   ├── amqp-client-5.21.0.jar
+│   ├── slf4j-api-1.7.36.jar
+│   └── slf4j-simple-1.7.36.jar
+├── <span class="path">dist/</span>                 <span class="cm"># Derleme çıktıları (fat JAR)</span>
+│   ├── MultiUserPaint.jar          <span class="cm"># İstemci</span>
+│   └── MultiUserPaintServer.jar    <span class="cm"># Sunucu</span>
+├── <span class="path">files/</span>                <span class="cm"># Sunucunun dosya deposu (PNG'ler)</span>
+├── build.ps1             <span class="cm"># PowerShell build scripti</span>
+├── build.xml             <span class="cm"># Apache Ant build dosyası</span>
+├── manifest.mf           <span class="cm"># İstemci JAR manifest (Main-Class: PaintClient)</span>
+└── manifest-server.mf    <span class="cm"># Sunucu JAR manifest (Main-Class: PaintServer)</span>
+</pre>
+</div>
+
+<!-- ============================================================ DERLEME -->
+<div class="divider"></div>
+<h1>BÖLÜM 2 — Derleme</h1>
+
+<div class="step-card" id="derleme-ps">
+  <div class="step-header">
+    <div class="step-num">1</div>
+    <div class="step-title">
+      <h2>PowerShell ile Derle <span class="badge win">Windows</span></h2>
+      <div class="sub">Önerilen yöntem — tek komutla istemci + sunucu JAR üretir</div>
+    </div>
+  </div>
+
+  <h3>Adım 1 — Proje klasörüne git</h3>
+<pre>
+cd "C:\Users\Caner\Desktop\Drive\İUC\Ağ ve İletişim Teknolojileri\proje\MultiUserPaint\MultiUserPaint"
+</pre>
+
+  <h3>Adım 2 — Script'i çalıştır</h3>
+<pre>
+.\build.ps1
+</pre>
+
+  <div class="note"><strong>İzin hatası alırsanız:</strong> PowerShell execution policy kısıtlı olabilir. Aşağıdaki komutla geçici olarak açın:</div>
+<pre>
+<span class="cm"># Yalnızca bu oturum için script çalıştırımını aç</span>
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\build.ps1
+</pre>
+
+  <h3>Beklenen Çıktı</h3>
+<pre>
+<span class="out">==> Cleaning build artefacts...
+==> Collecting source files...
+==> Compiling...
+    OK
+==> Building client JAR...
+    dist\MultiUserPaint.jar
+==> Building server JAR...
+    dist\MultiUserPaintServer.jar
+
+BUILD SUCCESSFUL
+  Client JAR : ...\dist\MultiUserPaint.jar
+  Server JAR : ...\dist\MultiUserPaintServer.jar</span>
+</pre>
+
+  <div class="ok"><strong>Başarı koşulu:</strong> <code>dist\</code> klasöründe iki fat JAR görünmeli. Fat JAR içinde bağımlılık kütüphaneleri (RabbitMQ AMQP client, SLF4J) gömülüdür; ayrıca <code>-cp</code> vermeye gerek yoktur.</div>
+</div>
+
+<div class="step-card" id="derleme-ant">
+  <div class="step-header">
+    <div class="step-num">1b</div>
+    <div class="step-title">
+      <h2>Apache Ant ile Derle <span class="badge both">Her Platform</span></h2>
+      <div class="sub">Ant kuruluysa bu yöntemi de kullanabilirsiniz</div>
+    </div>
+  </div>
+<pre>
+<span class="cm"># Proje klasöründe:</span>
+ant clean jar
+</pre>
+  <p>Veya yalnızca biri:</p>
+<pre>
+ant jar-client   <span class="cm"># Yalnızca istemci JAR</span>
+ant jar-server   <span class="cm"># Yalnızca sunucu JAR</span>
+ant clean        <span class="cm"># build/ ve dist/ klasörlerini sil</span>
+</pre>
+
+  <h3>Beklenen Çıktı</h3>
+<pre>
+<span class="out">BUILD SUCCESSFUL
+Total time: 3 seconds</span>
+</pre>
+</div>
+
+<div class="step-card" id="derleme-netbeans">
+  <div class="step-header">
+    <div class="step-num">1c</div>
+    <div class="step-title">
+      <h2>NetBeans ile Derle</h2>
+      <div class="sub">IDE içinde derleme ve doğrudan çalıştırma</div>
+    </div>
+  </div>
+  <ol>
+    <li>NetBeans'i açın → <strong>File → Open Project</strong> → <code>MultiUserPaint</code> klasörünü seçin.</li>
+    <li>Sol panelde projeye sağ tıklayın → <strong>Clean and Build</strong>.</li>
+    <li>Sunucuyu çalıştırmak için: <strong>Run → Set Project Configuration → server</strong>, ardından <strong>Run Project</strong>.</li>
+    <li>İstemciyi çalıştırmak için: Konfigürasyonu <strong>client</strong>'a çevirin, tekrar <strong>Run</strong>.</li>
+  </ol>
+  <div class="info">NetBeans <code>nbproject/project.properties</code> dosyasını kullanır. Kaynak uyumluluk zaten 1.8 (Java 8) olarak ayarlıdır.</div>
+</div>
+
+<!-- ============================================================ SOCKET MODU -->
+<div class="divider"></div>
+<h1>BÖLÜM 3 — Socket Modunda Çalıştırma <span class="badge socket">Socket</span></h1>
+<p>Socket modu RabbitMQ gerektirmez. Sunucu doğrudan TCP soketini dinler; istemciler port 9090'a bağlanır.</p>
+
+<div class="step-card" id="socket-sunucu">
+  <div class="step-header">
+    <div class="step-num">2</div>
+    <div class="step-title">
+      <h2>Sunucuyu Başlat</h2>
+      <div class="sub">Varsayılan port 9090</div>
+    </div>
+  </div>
+
+  <h3>Varsayılan ayarlarla (port 9090, files/ klasörü)</h3>
+<pre>
+java -jar dist\MultiUserPaintServer.jar
+</pre>
+
+  <h3>Özel port ile</h3>
+<pre>
+java -jar dist\MultiUserPaintServer.jar 9091
+</pre>
+
+  <h3>Özel port + özel dosya klasörü</h3>
+<pre>
+java -jar dist\MultiUserPaintServer.jar 9090 C:\paint\dosyalar
+</pre>
+
+  <h3>Beklenen Başlangıç Çıktısı</h3>
+<pre>
+<span class="out">Tem 10, 2026 10:00:00 ÖS multiuserpaint.server.PaintServer start
+BİLGİ: PaintServer started in SOCKET mode on port 9090 | files: files
+Tem 10, 2026 10:00:00 ÖS multiuserpaint.server.PaintServer main
+BİLGİ: Press Ctrl+C to stop.</span>
+</pre>
+
+  <div class="ok"><strong>Sunucu hazır!</strong> "SOCKET mode on port 9090" satırı görünüyorsa istemciler bağlanabilir.</div>
+  <div class="note"><strong>files/ klasörü:</strong> Sunucu başlarken <code>files/</code> klasörünü otomatik oluşturur. Çizilen resimler burada <code>file_1.png</code>, <code>file_2.png</code> şeklinde saklanır.</div>
+</div>
+
+<div class="step-card" id="socket-istemci">
+  <div class="step-header">
+    <div class="step-num">3</div>
+    <div class="step-title">
+      <h2>İstemciyi Başlat</h2>
+      <div class="sub">GUI açılır, login ekranı belirir</div>
+    </div>
+  </div>
+
+  <h3>Komut</h3>
+<pre>
+java -jar dist\MultiUserPaint.jar
+</pre>
+
+  <h3>Login Ekranında Doldurulacak Alanlar</h3>
+  <table>
+    <tr><th>Alan</th><th>Değer (Socket Modu)</th></tr>
+    <tr><td>Host</td><td><code>localhost</code> (aynı makinede) veya sunucunun IP adresi</td></tr>
+    <tr><td>Port</td><td><code>9090</code> (sunucu farklı portla başlatıldıysa o port)</td></tr>
+    <tr><td>Mode</td><td><strong>Socket</strong></td></tr>
+    <tr><td>Username</td><td>3-16 karakter, harf/rakam/alt çizgi (örn: <code>ali</code>)</td></tr>
+  </table>
+
+  <div class="info"><strong>Mod seçimi:</strong> Login ekranında "Socket" ve "MQ" seçeneği bulunur. Socket modunda Host ve Port doldurulur; MQ modunda yalnızca Broker Host istenir.</div>
+</div>
+
+<div class="step-card" id="socket-coklu">
+  <div class="step-header">
+    <div class="step-num">4</div>
+    <div class="step-title">
+      <h2>Çoklu İstemci Başlatma</h2>
+      <div class="sub">Gerçek zamanlı senkronizasyonu test etmek için birden fazla terminal açın</div>
+    </div>
+  </div>
+
+  <p>Her komut <strong>ayrı bir terminal/konsol penceresinde</strong> çalıştırılır:</p>
+<pre>
+<span class="cm"># Terminal 1 — İstemci 1 (kullanıcı: ali)</span>
+java -jar dist\MultiUserPaint.jar
+
+<span class="cm"># Terminal 2 — İstemci 2 (kullanıcı: veli)</span>
+java -jar dist\MultiUserPaint.jar
+
+<span class="cm"># Terminal 3 — İstemci 3 (kullanıcı: ayse)</span>
+java -jar dist\MultiUserPaint.jar
+</pre>
+
+  <div class="ok">Her istemci farklı kullanıcı adıyla giriş yapmalıdır. Aynı kullanıcı adı iki kez kullanılamaz — sunucu ikincisine <code>LOGIN_ERR: Username already taken</code> döner.</div>
+</div>
+
+<!-- ============================================================ RABBITMQ MODU -->
+<div class="divider"></div>
+<h1>BÖLÜM 4 — RabbitMQ Modunda Çalıştırma <span class="badge mq">RabbitMQ</span></h1>
+
+<div class="step-card" id="rabbitmq-kurulum">
+  <div class="step-header">
+    <div class="step-num">5</div>
+    <div class="step-title">
+      <h2>RabbitMQ Kurulumu <span class="badge win">Windows</span></h2>
+      <div class="sub">Broker yoksa bu adımı uygulayın</div>
+    </div>
+  </div>
+
+  <h3>Seçenek A — Chocolatey ile (Önerilen)</h3>
+<pre>
+<span class="cm"># PowerShell — Yönetici olarak çalıştır</span>
+choco install rabbitmq -y
+</pre>
+
+  <h3>Seçenek B — Manuel Kurulum</h3>
+  <ol>
+    <li>Erlang/OTP indirin: <code>https://www.erlang.org/downloads</code> → Windows installer.</li>
+    <li>RabbitMQ indirin: <code>https://www.rabbitmq.com/install-windows.html</code> → Windows installer.</li>
+    <li>Sırasıyla kurun: önce Erlang, sonra RabbitMQ.</li>
+  </ol>
+
+  <h3>Seçenek C — Docker ile (En Hızlı)</h3>
+<pre>
+<span class="cm"># Docker Desktop kuruluysa:</span>
+docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+</pre>
+  <p><code>-p 5672:5672</code> AMQP portu, <code>-p 15672:15672</code> yönetim paneli portudur.</p>
+
+  <h3>RabbitMQ Servisini Başlat (Manuel kurulumda)</h3>
+<pre>
+<span class="cm"># PowerShell — Yönetici olarak</span>
+Start-Service RabbitMQ
+
+<span class="cm"># Veya komut satırından:</span>
+rabbitmq-server start
+</pre>
+
+  <div class="note"><strong>Erlang kurulum sırası önemlidir:</strong> RabbitMQ kurulmadan önce Erlang kurulmalıdır. Aksi hâlde RabbitMQ servisi başlamaz.</div>
+</div>
+
+<div class="step-card" id="rabbitmq-dogrula">
+  <div class="step-header">
+    <div class="step-num">6</div>
+    <div class="step-title">
+      <h2>Broker'ı Doğrula</h2>
+      <div class="sub">Sunucuya bağlanmadan önce RabbitMQ'nun ayakta olduğundan emin olun</div>
+    </div>
+  </div>
+
+  <h3>Yöntem 1 — rabbitmqctl ile</h3>
+<pre>
+rabbitmqctl status
+</pre>
+<pre>
+<span class="out">Status of node rabbit@HOSTNAME ...
+Runtime
+OS PID: 12345
+...
+Listeners
+Interface: [::], port: 5672, protocol: amqp, purpose: AMQP 0-9-1 and AMQP 1.0</span>
+</pre>
+
+  <h3>Yöntem 2 — Yönetim Paneli (Web UI)</h3>
+  <p>Tarayıcıda <code>http://localhost:15672</code> adresini açın. Kullanıcı adı/şifre: <code>guest / guest</code>.</p>
+  <p>Yönetim paneli kuruluysa "Overview" sekmesinde bağlantı sayısını görebilirsiniz.</p>
+
+  <h3>Yöntem 3 — TCP Portu Kontrolü</h3>
+<pre>
+<span class="cm"># PowerShell:</span>
+Test-NetConnection -ComputerName localhost -Port 5672
+</pre>
+<pre>
+<span class="out">ComputerName     : localhost
+RemoteAddress    : 127.0.0.1
+RemotePort       : 5672
+InterfaceAlias   : Loopback Pseudo-Interface 1
+SourceAddress    : 127.0.0.1
+TcpTestSucceeded : <span class="out">True</span></span>
+</pre>
+
+  <div class="ok"><strong>TcpTestSucceeded: True</strong> görünüyorsa broker hazırdır.</div>
+  <div class="danger"><strong>TcpTestSucceeded: False</strong> ise RabbitMQ çalışmıyordur. Servis durumunu kontrol edin.</div>
+</div>
+
+<div class="step-card" id="mq-sunucu">
+  <div class="step-header">
+    <div class="step-num">7</div>
+    <div class="step-title">
+      <h2>Sunucuyu MQ Modunda Başlat</h2>
+      <div class="sub">--mq flag'i gereklidir</div>
+    </div>
+  </div>
+
+  <h3>Localhost broker (varsayılan)</h3>
+<pre>
+java -jar dist\MultiUserPaintServer.jar --mq
+</pre>
+
+  <h3>Uzak broker</h3>
+<pre>
+java -jar dist\MultiUserPaintServer.jar --mq 192.168.1.100
+</pre>
+
+  <h3>Uzak broker + özel dosya klasörü</h3>
+<pre>
+java -jar dist\MultiUserPaintServer.jar --mq 192.168.1.100 C:\paint\dosyalar
+</pre>
+
+  <h3>Beklenen Başlangıç Çıktısı</h3>
+<pre>
+<span class="out">Tem 10, 2026 10:00:00 ÖS multiuserpaint.server.mq.MQBroker connect
+BİLGİ: MQBroker connected to localhost:5672
+Tem 10, 2026 10:00:00 ÖS multiuserpaint.server.mq.MQServerTransport start
+BİLGİ: MQServerTransport started – consuming from paint.server
+Tem 10, 2026 10:00:00 ÖS multiuserpaint.server.PaintServer startMQMode
+BİLGİ: PaintServer started in MQ mode | broker=localhost | files: files
+BİLGİ: Press Ctrl+C to stop.</span>
+</pre>
+
+  <div class="ok"><strong>"MQ mode | broker=localhost"</strong> satırı görünüyorsa sunucu broker'a bağlandı ve <code>paint.server</code> kuyruğunu dinlemeye başladı.</div>
+</div>
+
+<div class="step-card" id="mq-istemci">
+  <div class="step-header">
+    <div class="step-num">8</div>
+    <div class="step-title">
+      <h2>İstemciyi MQ Modunda Başlat</h2>
+      <div class="sub">Login ekranında "MQ" modunu seçin</div>
+    </div>
+  </div>
+
+  <h3>Komut (socket ile aynı)</h3>
+<pre>
+java -jar dist\MultiUserPaint.jar
+</pre>
+
+  <h3>Login Ekranında Doldurulacak Alanlar</h3>
+  <table>
+    <tr><th>Alan</th><th>Değer (MQ Modu)</th></tr>
+    <tr><td>Mode</td><td><strong>MQ</strong> (radyo butonu)</td></tr>
+    <tr><td>Broker Host</td><td><code>localhost</code> (aynı makinede) veya broker IP adresi</td></tr>
+    <tr><td>Username</td><td>3-16 karakter, harf/rakam/alt çizgi</td></tr>
+  </table>
+
+  <h3>MQ Modunda İstemci Başlangıç Akışı</h3>
+  <ol>
+    <li>İstemci <code>paint.client.&lt;UUID&gt;</code> adlı özel kuyruk oluşturur.</li>
+    <li><code>paint.global</code> fanout exchange'e bağlanır (USER_JOIN/LEAVE alır).</li>
+    <li>Login_REQ mesajını <code>paint.server</code> kuyruğuna gönderir (AMQP header'larıyla).</li>
+    <li>Sunucu LOGIN_OK'u doğrudan kişisel kuyruğa (replyTo) gönderir.</li>
+    <li>Dosya açınca <code>paint.file.{fileId}</code> exchange'e bağlanır.</li>
+  </ol>
+
+  <div class="info"><strong>Çoklu istemci:</strong> Her istemci benzersiz UUID ile kendi kuyruğunu oluşturur. Aynı anda aynı makinede istediğiniz kadar istemci açabilirsiniz — kuyruk isimleri çakışmaz.</div>
+</div>
+
+<!-- ============================================================ TEST SENARYOLARI -->
+<div class="divider"></div>
+<h1>BÖLÜM 5 — Test Senaryoları</h1>
+<p>Aşağıdaki testlerin her biri hem <span class="badge socket">Socket</span> hem <span class="badge mq">RabbitMQ</span> modunda geçerlidir; aksi belirtilmedikçe.</p>
+
+<div class="step-card" id="test-login">
+  <div class="step-header">
+    <div class="step-num">T1</div>
+    <div class="step-title">
+      <h2>Login Testi</h2>
+      <div class="sub">Geçerli/geçersiz kullanıcı adı denemeleri</div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Senaryo</th><th>Girdi</th><th>Beklenen Sonuç</th></tr>
+    <tr><td>Başarılı login</td><td>Kullanıcı adı: <code>ali</code></td><td>Ana pencere açılır, dosya listesi gelir</td></tr>
+    <tr><td>Çok kısa kullanıcı adı</td><td><code>ab</code> (2 karakter)</td><td>Hata: "Username must be 3-16 chars..."</td></tr>
+    <tr><td>Geçersiz karakter</td><td><code>ali veli</code> (boşluk var)</td><td>Hata: "Invalid chars"</td></tr>
+    <tr><td>Aynı ad tekrar</td><td>2. istemci <code>ali</code> dener</td><td>Hata: "Username already taken"</td></tr>
+    <tr><td>İlk istemci bağlandıktan sonra 2. giriş</td><td>2. istemci <code>veli</code></td><td>İlk istemciye USER_JOIN bildirimi gelir</td></tr>
+  </table>
+
+  <h3>Sunucu Logunda Görünmesi Beklenenler</h3>
+<pre>
+<span class="out">BİLGİ: New MQ session 1 replyTo=paint.client.xxxx-xxxx   (MQ modu)
+BİLGİ: User logged in: ali (session 1)
+BİLGİ: User logged in: veli (session 2)</span>
+<span class="warn">UYARI: Login rejected (taken): ali</span>
+</pre>
+</div>
+
+<div class="step-card" id="test-cizim">
+  <div class="step-header">
+    <div class="step-num">T2</div>
+    <div class="step-title">
+      <h2>Çizim Senkronizasyonu Testi</h2>
+      <div class="sub">Bir istemcide çizilen şekil diğerlerinde anlık görünmeli</div>
+    </div>
+  </div>
+
+  <ol>
+    <li>2 veya daha fazla istemci aynı dosyayı açsın.</li>
+    <li>İstemci A'da araç çubuğundan Kalem seçin, canvas'a çizin.</li>
+    <li><strong>Beklenen:</strong> İstemci B'de çizgi anında görünür, üstünde A'nın kullanıcı adı gösterilir.</li>
+    <li>İstemci B'de Dikdörtgen aracıyla şekil çizin.</li>
+    <li><strong>Beklenen:</strong> İstemci A'da dikdörtgen görünür.</li>
+    <li>3. bir istemci C aynı dosyayı açsın.</li>
+    <li><strong>Beklenen:</strong> C, A ve B'nin tüm çizimlerini (canlı canvas) görür — diskten değil, A veya B'den senkronize alır.</li>
+  </ol>
+
+  <h3>Sunucu Logunda Görünmesi Beklenenler</h3>
+<pre>
+<span class="cm"># Socket modunda:</span>
+<span class="out">DRAW_EVENT → broadcastToFileViewers(fileId=1, exclude=sessionId)</span>
+
+<span class="cm"># MQ modunda — per-file exchange:</span>
+<span class="out">BİLGİ: Bound to file exchange: paint.file.1  (istemci C açtığında)</span>
+</pre>
+
+  <div class="info"><strong>Canvas senkronizasyonu (3. istemci):</strong> C dosyayı açınca sunucu, A veya B'den <code>CANVAS_SNAPSHOT_REQ</code> ile anlık canvas ister. A veya B cevap olarak <code>CANVAS_SNAPSHOT_DATA</code> gönderir. Sunucu bunu C'ye <code>FILE_OPEN_DATA</code> olarak iletir. Bu sayede C boş canvas yerine güncel durumu görür.</div>
+</div>
+
+<div class="step-card" id="test-dosya">
+  <div class="step-header">
+    <div class="step-num">T3</div>
+    <div class="step-title">
+      <h2>Dosya İşlemleri Testi</h2>
+      <div class="sub">Oluşturma, açma, kaydetme, silme</div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>İşlem</th><th>Adımlar</th><th>Beklenen Sonuç</th></tr>
+    <tr>
+      <td><strong>Yeni Dosya Oluştur</strong></td>
+      <td>Menü → Yeni Dosya → Ad ve boyut gir → Tamam</td>
+      <td>Yeni sekme açılır; dosya listesi tüm istemcilerde güncellenir</td>
+    </tr>
+    <tr>
+      <td><strong>Dosya Aç</strong></td>
+      <td>Dosya listesinden bir satıra çift tıkla</td>
+      <td>Canvas yüklenir; diğer kullanıcılar aynı dosyayı açmışsa canlı görüntü gelir</td>
+    </tr>
+    <tr>
+      <td><strong>Kaydet (Ctrl+S)</strong></td>
+      <td>Çizim yaptıktan sonra Ctrl+S</td>
+      <td>Sunucu logu: "FILE_SAVE_OK"; <code>files/file_X.png</code> güncellenir</td>
+    </tr>
+    <tr>
+      <td><strong>Otomatik Kayıt</strong></td>
+      <td>60 saniye bekleyin</td>
+      <td>Kullanıcı arayüzünde "Auto-saved" bildirimi; disk dosyası güncellenir</td>
+    </tr>
+    <tr>
+      <td><strong>Dosya Sil</strong></td>
+      <td>Dosya listesinde Sil butonu</td>
+      <td>Dosya listesinden kalkar; diğer istemciler bildirim alır</td>
+    </tr>
+  </table>
+
+  <h3>files/ Klasörünü Kontrol Et</h3>
+<pre>
+<span class="cm"># Sunucu çalışırken, başka bir terminalde:</span>
+Get-ChildItem ".\files\"
+</pre>
+<pre>
+<span class="out">    Directory: C:\...\MultiUserPaint\files
+
+Mode                LastWriteTime   Length Name
+----                -------------   ------ ----
+-a----       10.07.2026    10:05  1920004  file_1.png
+-a----       10.07.2026    10:12   640004  file_2.png</span>
+</pre>
+</div>
+
+<div class="step-card" id="test-pano">
+  <div class="step-header">
+    <div class="step-num">T4</div>
+    <div class="step-title">
+      <h2>Pano (Kopyala / Kes / Yapıştır) Testi</h2>
+      <div class="sub">Pano verisi sunucuda oturuma özgü saklanır</div>
+    </div>
+  </div>
+
+  <ol>
+    <li>İstemci A ve B aynı dosyayı açsın.</li>
+    <li>İstemci A'da Seçim aracını seç, canvas'ta bir alan seç.</li>
+    <li><strong>Kopyala:</strong> Ctrl+C veya araç çubuğu kopyala butonu.</li>
+    <li><strong>Yapıştır:</strong> Ctrl+V veya araç çubuğu yapıştır butonu, hedef koordinata tıkla.</li>
+    <li><strong>Beklenen:</strong> Kopyalanan bölge hem A'ya hem B'ye (ve dosyayı açık olan tüm istemcilere) gönderilir.</li>
+    <li>Aynı işlemi Kes (Ctrl+X) ile tekrarlayın.</li>
+    <li><strong>Beklenen:</strong> Kesilen bölge A'nın canvas'ından silinir; yapıştırma yine çalışır.</li>
+  </ol>
+
+  <div class="note"><strong>Pano izolasyonu:</strong> A'nın panosu B'yi etkilemez. B kendi Ctrl+C'sini yapana kadar A'nın kopyaladığını yapıştıramaz.</div>
+</div>
+
+<div class="step-card" id="test-undo">
+  <div class="step-header">
+    <div class="step-num">T5</div>
+    <div class="step-title">
+      <h2>Undo Senkronizasyonu Testi</h2>
+      <div class="sub">Geri alma işlemi diğer kullanıcılara yayılır</div>
+    </div>
+  </div>
+
+  <ol>
+    <li>İstemci A ve B aynı dosyayı açsın.</li>
+    <li>İstemci A'da birkaç çizgi çizin.</li>
+    <li>İstemci A'da <strong>Z</strong> tuşuna basın (Undo).</li>
+    <li><strong>Beklenen A:</strong> Son çizgi geri alınır.</li>
+    <li><strong>Beklenen B:</strong> B'nin canvas'ı da A ile senkronize olur — A'nın undo sonrası durumunu gösterir.</li>
+  </ol>
+
+  <h3>Undo Mekanizması</h3>
+<pre>
+<span class="cm"># İstemci A, Z tuşuna basınca:</span>
+1. canvas.undo()                          <span class="cm">→ yerel stack'ten geri al</span>
+2. connection.sendCanvasSnapshotData(...)  <span class="cm">→ sunucuya güncel canvas gönder</span>
+
+<span class="cm"># Sunucu CANVAS_SNAPSHOT_DATA alınca:</span>
+3. pendingOpens listesini işle            <span class="cm">→ bekleyen yeni istemciler varsa onlara gönder</span>
+4. broadcastToFileViewers(CANVAS_UPDATE)  <span class="cm">→ B ve diğerlerine yay</span>
+
+<span class="cm"># İstemci B CANVAS_UPDATE alınca:</span>
+5. canvas.fromPixelBytes(...)             <span class="cm">→ canvas A ile senkronize</span>
+</pre>
+
+  <div class="info">Undo stack maksimum 20 adım tutar. 20'den fazla geri alma yapılamaz.</div>
+</div>
+
+<div class="step-card" id="test-keepalive">
+  <div class="step-header">
+    <div class="step-num">T6</div>
+    <div class="step-title">
+      <h2>Keepalive / Bağlantı Kopma Testi</h2>
+      <div class="sub">90 saniye işlem yapmayan oturum kapanır</div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>Senaryo</th><th>Adımlar</th><th>Beklenen Sonuç</th></tr>
+    <tr>
+      <td><strong>Normal keepalive</strong></td>
+      <td>İstemci açık, 30+ saniye bekle</td>
+      <td>Logda PING/PONG; bağlantı kesilmez</td>
+    </tr>
+    <tr>
+      <td><strong>Kullanıcı pencereyi kapatır</strong></td>
+      <td>İstemci X penceresini kapat</td>
+      <td>Diğer istemcilere USER_LEAVE yayını; kullanıcı listesinden düşer</td>
+    </tr>
+    <tr>
+      <td><strong>Zaman aşımı simülasyonu</strong></td>
+      <td>İstemci sürecini kill et (<code>taskkill /F /PID &lt;pid&gt;</code>); 90 saniye bekle</td>
+      <td>Sunucu 90 saniye PING gelmeyince oturumu kapatır ve USER_LEAVE yayar</td>
+    </tr>
+  </table>
+
+  <h3>Sunucu Logunda Zaman Aşımı</h3>
+<pre>
+<span class="warn">UYARI: Keepalive timeout for ali</span>
+<span class="out">BİLGİ: User disconnected (MQ timeout): ali</span>
+</pre>
+
+  <div class="note"><strong>Değerleri değiştirmek için:</strong> <code>ProtocolConstants.java</code> içindeki <code>PING_INTERVAL_SECONDS</code> (30) ve <code>KEEPALIVE_TIMEOUT_SECONDS</code> (90) sabitlerini düzenleyip yeniden derleyin.</div>
+</div>
+
+<!-- ============================================================ SORUN GİDERME -->
+<div class="divider"></div>
+<h1>BÖLÜM 6 — Sorun Giderme</h1>
+
+<div class="step-card" id="hata-port">
+  <div class="step-header">
+    <div class="step-num">⚠</div>
+    <div class="step-title">
+      <h2>Port Meşgul / Bağlantı Reddedildi</h2>
+    </div>
+  </div>
+
+  <h3>Hata Mesajı</h3>
+<pre>
+<span class="err">java.net.BindException: Address already in use: NET_Bind</span>
+</pre>
+
+  <h3>Çözüm — Portu Kullanan Süreci Bul ve Durdur</h3>
+<pre>
+<span class="cm"># Portu kim kullanıyor?</span>
+netstat -ano | findstr :9090
+</pre>
+<pre>
+<span class="out">  TCP    0.0.0.0:9090    0.0.0.0:0    LISTENING    12345</span>
+</pre>
+<pre>
+<span class="cm"># Süreci sonlandır (12345 yerine kendi PID'inizi yazın)</span>
+taskkill /F /PID 12345
+</pre>
+
+  <h3>Veya Farklı Port Kullan</h3>
+<pre>
+java -jar dist\MultiUserPaintServer.jar 9091
+<span class="cm"># İstemcide de port alanını 9091 yap</span>
+</pre>
+</div>
+
+<div class="step-card" id="hata-mq">
+  <div class="step-header">
+    <div class="step-num">⚠</div>
+    <div class="step-title">
+      <h2>RabbitMQ Bağlantı Hatası</h2>
+    </div>
+  </div>
+
+  <h3>Hata Mesajları</h3>
+<pre>
+<span class="err">com.rabbitmq.client.AlreadyClosedException: clean connection shutdown</span>
+<span class="err">java.net.ConnectException: Connection refused: localhost/127.0.0.1:5672</span>
+</pre>
+
+  <h3>Kontrol Listesi</h3>
+  <ul class="checklist">
+    <li>RabbitMQ servisi çalışıyor mu? → <code>rabbitmqctl status</code></li>
+    <li>Port 5672 açık mı? → <code>Test-NetConnection localhost 5672</code></li>
+    <li>Firewall port 5672'ye izin veriyor mu?</li>
+    <li>Docker kullanıyorsanız container çalışıyor mu? → <code>docker ps</code></li>
+    <li>Sunucu <code>--mq</code> flag'i ile başlatıldı mı?</li>
+    <li>İstemcide doğru broker host girildi mi?</li>
+  </ul>
+
+  <h3>RabbitMQ Servisini Yeniden Başlat</h3>
+<pre>
+<span class="cm"># PowerShell — Yönetici olarak:</span>
+Restart-Service RabbitMQ
+
+<span class="cm"># Docker kullanıyorsanız:</span>
+docker restart rabbitmq
+</pre>
+
+  <h3>RabbitMQ Yönetim Panelini Etkinleştir (Opsiyonel)</h3>
+<pre>
+rabbitmq-plugins enable rabbitmq_management
+<span class="cm"># Tarayıcıda: http://localhost:15672  (guest/guest)</span>
+</pre>
+</div>
+
+<div class="step-card" id="hata-derleme">
+  <div class="step-header">
+    <div class="step-num">⚠</div>
+    <div class="step-title">
+      <h2>Derleme Hataları</h2>
+    </div>
+  </div>
+
+  <h3>Hata: javac bulunamadı</h3>
+<pre>
+<span class="err">The term 'javac' is not recognized...</span>
+</pre>
+  <p><strong>Çözüm:</strong> JDK'nın <code>bin</code> dizinini PATH'e ekleyin veya <code>build.ps1</code> içindeki <code>$jdk21</code> değişkenini kendi JDK yolunuza güncelleyin.</p>
+<pre>
+<span class="cm"># build.ps1 içinde:</span>
+$jdk21 = <span class="st">"C:\Program Files\Java\jdk-21\bin"</span>
+<span class="cm"># Bu satırı kendi JDK kurulum yolunuza göre değiştirin</span>
+</pre>
+
+  <h3>Hata: lib/ klasörü eksik</h3>
+<pre>
+<span class="err">error: package com.rabbitmq.client does not exist</span>
+</pre>
+  <p><strong>Çözüm:</strong> <code>lib/</code> klasörünün şu dosyaları içerdiğini kontrol edin:</p>
+<pre>
+Get-ChildItem .\lib\
+</pre>
+<pre>
+<span class="out">amqp-client-5.21.0.jar
+slf4j-api-1.7.36.jar
+slf4j-simple-1.7.36.jar</span>
+</pre>
+
+  <h3>Hata: execution policy</h3>
+<pre>
+<span class="err">.\build.ps1 : File ... cannot be loaded because running scripts is disabled on this system.</span>
+</pre>
+<pre>
+<span class="cm"># Geçici çözüm:</span>
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\build.ps1
+</pre>
+
+  <h3>Hata: Türkçe karakter sorunu (UTF-8)</h3>
+<pre>
+<span class="err">error: unmappable character (0xC4) for encoding windows-1252</span>
+</pre>
+  <p><strong>Çözüm:</strong> Derleme komutu zaten <code>-encoding UTF-8</code> içeriyor. Ant ile derliyorsanız <code>build.xml</code>'de <code>encoding="UTF-8"</code> var — sorun devam ederse:</p>
+<pre>
+<span class="cm"># Ant'a JVM parametresi verin:</span>
+ant -Dfile.encoding=UTF-8 jar
+</pre>
+</div>
+
+<!-- ============================================================ HIZLI REFERANS -->
+<div class="divider"></div>
+<h1>BÖLÜM 7 — Hızlı Referans</h1>
+
+<div class="step-card">
+  <h3>Tüm Komutlar Bir Bakışta</h3>
+  <table>
+    <tr><th>Komut</th><th>Açıklama</th></tr>
+    <tr><td><code>.\build.ps1</code></td><td>PowerShell ile derle (istemci + sunucu JAR)</td></tr>
+    <tr><td><code>ant jar</code></td><td>Ant ile derle (istemci + sunucu JAR)</td></tr>
+    <tr><td><code>java -jar dist\MultiUserPaintServer.jar</code></td><td>Sunucu — socket modu, port 9090</td></tr>
+    <tr><td><code>java -jar dist\MultiUserPaintServer.jar 9091</code></td><td>Sunucu — socket modu, port 9091</td></tr>
+    <tr><td><code>java -jar dist\MultiUserPaintServer.jar --mq</code></td><td>Sunucu — MQ modu, localhost:5672</td></tr>
+    <tr><td><code>java -jar dist\MultiUserPaintServer.jar --mq 192.168.1.5</code></td><td>Sunucu — MQ modu, uzak broker</td></tr>
+    <tr><td><code>java -jar dist\MultiUserPaint.jar</code></td><td>İstemci — login ekranı açılır</td></tr>
+    <tr><td><code>rabbitmqctl status</code></td><td>RabbitMQ servis durumu</td></tr>
+    <tr><td><code>Test-NetConnection localhost 5672</code></td><td>Port 5672 açık mı?</td></tr>
+    <tr><td><code>docker run -d -p 5672:5672 rabbitmq:3</code></td><td>Docker ile hızlı broker başlat</td></tr>
+  </table>
+
+  <h3>Klavye Kısayolları (İstemci)</h3>
+  <table>
+    <tr><th>Kısayol</th><th>İşlev</th></tr>
+    <tr><td><code>Z</code></td><td>Undo (geri al) + diğer istemcilere senkronize et</td></tr>
+    <tr><td><code>Ctrl+C</code></td><td>Seçili alanı kopyala</td></tr>
+    <tr><td><code>Ctrl+X</code></td><td>Seçili alanı kes</td></tr>
+    <tr><td><code>Ctrl+V</code></td><td>Yapıştır</td></tr>
+    <tr><td><code>Ctrl+S</code></td><td>Dosyayı kaydet</td></tr>
+    <tr><td><code>Delete</code></td><td>Seçili alanı sil</td></tr>
+  </table>
+</div>
+
+<div class="divider"></div>
+<p style="text-align:center; color:#888; font-size:9.5pt; margin-top:20px;">
+  MultiUserPaint — Bilgisayar Ağları Projesi &nbsp;|&nbsp; Çalıştırma ve Test Kılavuzu
+</p>
+</main>
+</body>
+</html>

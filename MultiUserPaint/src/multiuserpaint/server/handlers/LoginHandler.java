@@ -54,6 +54,6 @@ public class LoginHandler {
     }
 
     private void enqueue(ClientSession session, byte[] data) {
-        session.writeQueue.offer(java.nio.ByteBuffer.wrap(data));
+        session.enqueue(data);
     }
 }

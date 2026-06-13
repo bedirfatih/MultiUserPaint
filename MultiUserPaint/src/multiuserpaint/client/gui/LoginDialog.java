@@ -4,12 +4,14 @@ import javax.swing.*;
 import java.awt.*;
 
 /**
- * Modal dialog to collect server address, port, and username.
+ * Modal dialog to collect server address, port, username, and transport mode.
  */
 public class LoginDialog extends JDialog {
-    private final JTextField hostField    = new JTextField("localhost", 15);
-    private final JTextField portField    = new JTextField("9090", 6);
+    private final JTextField hostField     = new JTextField("localhost", 15);
+    private final JTextField portField     = new JTextField("9090", 6);
     private final JTextField usernameField = new JTextField(15);
+    private final JComboBox<String> modeBox =
+        new JComboBox<>(new String[]{"Socket (TCP)", "RabbitMQ (AMQP)"});
     private boolean confirmed = false;
 
     public LoginDialog(Frame parent) {
@@ -25,21 +27,26 @@ public class LoginDialog extends JDialog {
         c.insets = new Insets(5, 5, 5, 5);
         c.anchor = GridBagConstraints.WEST;
 
-        c.gridx = 0; c.gridy = 0; form.add(new JLabel("Server Host:"), c);
+        c.gridx = 0; c.gridy = 0; form.add(new JLabel("Mode:"), c);
+        c.gridx = 1;               form.add(modeBox, c);
+
+        c.gridx = 0; c.gridy = 1; form.add(new JLabel("Server Host:"), c);
         c.gridx = 1;               form.add(hostField, c);
 
-        c.gridx = 0; c.gridy = 1; form.add(new JLabel("Port:"), c);
+        c.gridx = 0; c.gridy = 2; form.add(new JLabel("Port:"), c);
         c.gridx = 1;               form.add(portField, c);
 
-        c.gridx = 0; c.gridy = 2; form.add(new JLabel("Username:"), c);
+        c.gridx = 0; c.gridy = 3; form.add(new JLabel("Username:"), c);
         c.gridx = 1;               form.add(usernameField, c);
+
+        modeBox.addActionListener(e ->
+            portField.setText(modeBox.getSelectedIndex() == 1 ? "5672" : "9090"));
 
         JButton connectBtn = new JButton("Connect");
         JButton cancelBtn  = new JButton("Cancel");
         connectBtn.addActionListener(e -> onConnect());
         cancelBtn.addActionListener(e -> dispose());
 
-        // Press Enter to connect
         getRootPane().setDefaultButton(connectBtn);
 
         JPanel buttons = new JPanel();
@@ -69,10 +76,11 @@ public class LoginDialog extends JDialog {
     }
 
     public boolean isConfirmed() { return confirmed; }
+    public boolean isMQMode()    { return modeBox.getSelectedIndex() == 1; }
     public String getHost()      { return hostField.getText().trim(); }
     public int getPort() {
         try { return Integer.parseInt(portField.getText().trim()); }
-        catch (NumberFormatException e) { return 9090; }
+        catch (NumberFormatException e) { return isMQMode() ? 5672 : 9090; }
     }
     public String getUsername()  { return usernameField.getText().trim(); }
 }

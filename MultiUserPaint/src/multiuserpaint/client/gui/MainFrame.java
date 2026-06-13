@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -358,6 +359,7 @@ public class MainFrame extends JFrame {
                 case FILE_OPEN_DATA: {
                     MessageDecoder.FileOpenDataPayload p = MessageDecoder.decodeFileOpenData(msg.getPayload());
                     addFileTab(p.fileId, p.filename, p.pixelData, p.width, p.height);
+                    connection.notifyFileOpened(p.fileId);
                     break;
                 }
                 case FILE_SAVE_OK:
@@ -458,10 +460,14 @@ public class MainFrame extends JFrame {
         if (!dlg.isConfirmed()) return;
 
         try {
-            connection.connect(dlg.getHost(), dlg.getPort());
+            if (dlg.isMQMode()) {
+                connection.connectMQ(dlg.getHost(), dlg.getPort());
+            } else {
+                connection.connect(dlg.getHost(), dlg.getPort());
+            }
             connection.sendLoginReq(dlg.getUsername());
             setStatus("Logging in as " + dlg.getUsername() + "...");
-        } catch (IOException e) {
+        } catch (IOException | TimeoutException e) {
             JOptionPane.showMessageDialog(this,
                 "Cannot connect: " + e.getMessage(), "Connection Error", JOptionPane.ERROR_MESSAGE);
         }

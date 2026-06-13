@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"/>
+<title>MultiUserPaint – Protokol ve FSM Belgesi</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; color: #222; }
+h1   { color: #2c5f9e; border-bottom: 2px solid #2c5f9e; }
+h2   { color: #2c5f9e; margin-top: 40px; }
+h3   { color: #444; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+th, td { border: 1px solid #aaa; padding: 8px 12px; text-align: left; vertical-align: top; }
+th { background: #2c5f9e; color: white; }
+tr:nth-child(even) { background: #f0f5ff; }
+code { background: #eee; padding: 2px 5px; border-radius: 3px; font-size: 0.93em; }
+pre  { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 6px;
+       overflow-x: auto; font-size: 0.92em; }
+.note { background: #fff3cd; border-left: 4px solid #f90; padding: 10px 16px;
+        margin: 16px 0; }
+.mq   { background: #e8f5e9; border-left: 4px solid #4caf50; padding: 10px 16px;
+        margin: 16px 0; }
+</style>
+</head>
+<body>
+
+<h1>MultiUserPaint – Protokol ve FSM Belgesi</h1>
+<p>Bu belge dil ve platform bagımsız olarak MultiUserPaint sisteminin mesaj
+protokolünü, sonlu durum makinelerini (FSM) ve mesaj kuyrugu topolojisini
+tanımlar.</p>
+
+<!-- ================================================================== -->
+<h2>1. Tel Çerçeve Formatı (Wire Frame)</h2>
+
+<p>Hem Socket hem de MQ modunda mesaj gövdesi aynı ikili formattadır:</p>
+
+<pre>
+ 0       1       2       3       4       5       6       7
++-------+-------+-------+-------+-------+-------+-------+-------+
+| MAGIC (0xCAFE)|  VER  | TYPE  |        PAYLOAD_LEN (4B)       |
++-------+-------+-------+-------+-------+-------+-------+-------+
+|                     PAYLOAD (0..PAYLOAD_LEN bayt)             |
++-------+-------+-------+...------------------------------------+
+</pre>
+
+<table>
+<tr><th>Alan</th><th>Boyut</th><th>Açıklama</th></tr>
+<tr><td>MAGIC</td><td>2 B</td><td>Sabit <code>0xCAFE</code>, büyük-endian. Çerçeve başlangıcını işaretler.</td></tr>
+<tr><td>VER</td><td>1 B</td><td>Protokol versiyonu. Şu an: <code>0x01</code>. İleriye uyumluluk için kontrol edilmeden tüketilir.</td></tr>
+<tr><td>TYPE</td><td>1 B</td><td>Mesaj tipi (bkz. Bölüm 2).</td></tr>
+<tr><td>PAYLOAD_LEN</td><td>4 B</td><td>Payload bayt sayısı, big-endian. 0..10 485 760 (10 MB).</td></tr>
+<tr><td>PAYLOAD</td><td>değişken</td><td>Mesaja özgü veri. PAYLOAD_LEN = 0 ise yok.</td></tr>
+</table>
+
+<!-- ================================================================== -->
+<h2>2. Mesaj Tipleri</h2>
+
+<h3>2.1 Giriş (Login)</h3>
+<table>
+<tr><th>Tip</th><th>Kod</th><th>Yön</th><th>Payload</th></tr>
+<tr><td>LOGIN_REQ</td><td>0x01</td><td>İstemci → Sunucu</td><td>[kullanıcı_adı : utf8_str]</td></tr>
+<tr><td>LOGIN_OK</td><td>0x02</td><td>Sunucu → İstemci</td><td>[sessionId : int32] [sunucu_zaman : int64]</td></tr>
+<tr><td>LOGIN_ERR</td><td>0x03</td><td>Sunucu → İstemci</td><td>[hata_kodu : uint8] [mesaj : utf8_str]</td></tr>
+</table>
+
+<p>Hata kodları: <code>0x01</code> = kullanıcı adı alınmış, <code>0x02</code> = geçersiz format.</p>
+
+<h3>2.2 Dosya İşlemleri</h3>
+<table>
+<tr><th>Tip</th><th>Kod</th><th>Yön</th><th>Payload</th></tr>
+<tr><td>FILE_CREATE_REQ</td><td>0x10</td><td>İ→S</td><td>[dosya_adı : str] [genişlik : int32] [yükseklik : int32]</td></tr>
+<tr><td>FILE_CREATE_OK</td><td>0x11</td><td>S→İ</td><td>[fileId : int32] [dosya_adı : str]</td></tr>
+<tr><td>FILE_OPEN_REQ</td><td>0x12</td><td>İ→S</td><td>[fileId : int32]</td></tr>
+<tr><td>FILE_OPEN_DATA</td><td>0x13</td><td>S→İ</td><td>[fileId] [dosya_adı : str] [sahip : str] [g : int32] [y : int32] [piksel_uzunluk : int32] [ARGB_piksel_verisi : bytes]</td></tr>
+<tr><td>FILE_LIST_REQ</td><td>0x14</td><td>İ→S</td><td>(boş)</td></tr>
+<tr><td>FILE_LIST_RESP</td><td>0x15</td><td>S→İ</td><td>[adet : uint16] { [fileId] [ad : str] [sahip : str] [g : i32] [y : i32] [son_değ : int64] }*</td></tr>
+<tr><td>FILE_SAVE_REQ</td><td>0x16</td><td>İ→S</td><td>[fileId] [piksel_uzunluk : int32] [ARGB_piksel_verisi : bytes]</td></tr>
+<tr><td>FILE_SAVE_OK</td><td>0x17</td><td>S→İ</td><td>[fileId]</td></tr>
+<tr><td>FILE_DELETE_REQ</td><td>0x18</td><td>İ→S</td><td>[fileId]</td></tr>
+<tr><td>FILE_DELETE_OK</td><td>0x19</td><td>S→İ</td><td>[fileId]</td></tr>
+<tr><td>FILE_DELETE_ERR</td><td>0x1A</td><td>S→İ</td><td>[fileId] [neden : str]</td></tr>
+</table>
+
+<p>Piksel verisi: ARGB sıralamasında düz bayt dizisi; her piksel 4 bayt
+(A, R, G, B). Toplam boyut = genişlik × yükseklik × 4.</p>
+
+<h3>2.3 Çizim</h3>
+<table>
+<tr><th>Tip</th><th>Kod</th><th>Yön</th><th>Payload</th></tr>
+<tr><td>DRAW_EVENT</td><td>0x20</td><td>İ→S</td><td>[fileId] [araç : uint8] [renk_ARGB : int32] [kalınlık : int16] [x1 y1 x2 y2 : int32 × 4]</td></tr>
+<tr><td>DRAW_BROADCAST</td><td>0x21</td><td>S→İ (diğerleri)</td><td>[fileId] [gönderen : str] [araç] [renk_ARGB] [kalınlık] [x1 y1 x2 y2]</td></tr>
+</table>
+
+<h3>2.4 Pano (Clipboard)</h3>
+<table>
+<tr><th>Tip</th><th>Kod</th><th>Yön</th><th>Payload</th></tr>
+<tr><td>CLIPBOARD_COPY</td><td>0x30</td><td>İ→S</td><td>[fileId] [rx ry rw rh : int32×4] [uzunluk : int32] [piksel : bytes]</td></tr>
+<tr><td>CLIPBOARD_PASTE_REQ</td><td>0x31</td><td>İ→S</td><td>[fileId] [yapıştır_x : int32] [yapıştır_y : int32]</td></tr>
+<tr><td>CLIPBOARD_DATA</td><td>0x32</td><td>S→İ</td><td>[fileId] [x y g y_clip : int32×4] [uzunluk] [piksel]</td></tr>
+<tr><td>CLIPBOARD_CUT</td><td>0x33</td><td>İ→S</td><td>CLIPBOARD_COPY ile aynı yapı</td></tr>
+</table>
+
+<h3>2.5 Kullanıcı Olayları</h3>
+<table>
+<tr><th>Tip</th><th>Kod</th><th>Yön</th><th>Payload</th></tr>
+<tr><td>USER_JOIN</td><td>0x40</td><td>S→İ (fanout)</td><td>[kullanıcı_adı : str] [zaman : int64]</td></tr>
+<tr><td>USER_LEAVE</td><td>0x41</td><td>S→İ (fanout)</td><td>[kullanıcı_adı : str] [zaman : int64]</td></tr>
+<tr><td>USER_LIST_REQ</td><td>0x42</td><td>İ→S</td><td>(boş)</td></tr>
+<tr><td>USER_LIST_RESP</td><td>0x43</td><td>S→İ (doğrudan)</td><td>[adet : uint16] [kullanıcı_adı : str]*</td></tr>
+</table>
+
+<h3>2.6 Tuval Anlık Görüntüsü</h3>
+<table>
+<tr><th>Tip</th><th>Kod</th><th>Yön</th><th>Payload</th></tr>
+<tr><td>CANVAS_SNAPSHOT_REQ</td><td>0x60</td><td>S→İ (istek)</td><td>[fileId]</td></tr>
+<tr><td>CANVAS_SNAPSHOT_DATA</td><td>0x61</td><td>İ→S (yanıt)</td><td>[fileId] [g y : int32×2] [uzunluk] [piksel]</td></tr>
+<tr><td>CANVAS_UPDATE</td><td>0x62</td><td>S→İ (yayın)</td><td>[fileId] [g y] [uzunluk] [piksel]</td></tr>
+</table>
+
+<h3>2.7 Sistem / Canlı Tutma</h3>
+<table>
+<tr><th>Tip</th><th>Kod</th><th>Yön</th><th>Payload</th></tr>
+<tr><td>AUTOSAVE_NOTIFY</td><td>0x50</td><td>S→İ</td><td>[fileId] [zaman : int64]</td></tr>
+<tr><td>PING</td><td>0xF0</td><td>İ↔S</td><td>(boş)</td></tr>
+<tr><td>PONG</td><td>0xF1</td><td>S↔İ</td><td>(boş)</td></tr>
+<tr><td>ERROR</td><td>0xFF</td><td>S→İ</td><td>[mesaj : str]</td></tr>
+</table>
+
+<p>UTF-8 dizgi formatı: <code>[uzunluk : uint16][utf8_baytlar]</code></p>
+
+<!-- ================================================================== -->
+<h2>3. Sonlu Durum Makineleri (FSM)</h2>
+
+<h3>3.1 Sunucu Tarafı – Oturum FSM</h3>
+<pre>
+                  TCP bağlantısı / AMQP mesajı
+                           |
+                           v
+                     [HANDSHAKE]
+                    LOGIN_REQ alındı
+                         |
+               +---------+---------+
+               |                   |
+          geçerli               geçersiz
+               |                   |
+               v                   v
+           [ACTIVE]            [ERROR]  ──► bağlantı kapat
+               |
+     +─────────+─────────+
+     |         |         |
+ FILE_SAVE  KAPAN    keepalive
+  gönderildi  isteği   süresi doldu
+     |         |         |
+     v         v         v
+  [SAVING] [CLOSING] [ERROR]
+     |
+ disk yaz tamamlandı
+     |
+     v
+  [ACTIVE]
+</pre>
+
+<h3>3.2 İstemci Tarafı – Bağlantı FSM</h3>
+<pre>
+ [DISCONNECTED]
+       |
+  connect() / connectMQ()
+       |
+       v
+  [CONNECTING]
+       |
+  soket/AMQP bağlandı
+       |
+       v
+  [LOGGING_IN]
+       |
+  LOGIN_REQ gönderildi
+       |
+  +────+────+
+  |         |
+LOGIN_OK  LOGIN_ERR
+  |         |
+  v         v
+[CONNECTED] [LOGGING_IN] → yeniden dene veya [DISCONNECTED]
+  |
+  | disconnect() veya hata
+  v
+[DISCONNECTED]
+</pre>
+
+<!-- ================================================================== -->
+<h2>4. Mesaj Kuyrugu Topolojisi (MQ Modu)</h2>
+
+<div class="mq">
+<strong>Not:</strong> Mesaj kuyrugu mimarisi tüm protokol semantiğini
+korur; yalnızca transport katmanı değişir.
+</div>
+
+<h3>4.1 Kuyruk ve Exchange Şeması</h3>
+
+<pre>
+  İstemci A                     RabbitMQ                    Sunucu
+  ─────────                     ────────                    ──────
+  paint.client.{uuid-a}  ◄──── paint.global (fanout) ◄───  USER_JOIN/LEAVE
+                          ◄────  paint.file.1 (fanout) ◄──  DRAW_BROADCAST (dosya 1)
+                          ◄────  (doğrudan)  ◄─────────────  LOGIN_OK, FILE_OPEN_DATA, ...
+                    ─────────► paint.server ──────────────►  tüm istek mesajları
+
+  İstemci B                     RabbitMQ
+  ─────────
+  paint.client.{uuid-b}  ◄────  paint.global (fanout)
+                          ◄────  paint.file.1 (fanout)      (dosya 1 açıksa)
+                          ◄────  paint.file.2 (fanout)      (dosya 2 açıksa)
+</pre>
+
+<h3>4.2 Exchange Özellikleri</h3>
+<table>
+<tr><th>İsim</th><th>Tür</th><th>Dayanıklı</th><th>Oto-Sil</th><th>Kullanım</th></tr>
+<tr><td>paint.global</td><td>fanout</td><td>Hayır</td><td>Hayır</td><td>USER_JOIN, USER_LEAVE, FILE_LIST_RESP yayını</td></tr>
+<tr><td>paint.file.{id}</td><td>fanout</td><td>Hayır</td><td>Evet</td><td>Dosyaya özgü DRAW_BROADCAST, CANVAS_UPDATE</td></tr>
+</table>
+
+<h3>4.3 Kuyruk Özellikleri</h3>
+<table>
+<tr><th>İsim Şablonu</th><th>Özel</th><th>Oto-Sil</th><th>Açıklama</th></tr>
+<tr><td>paint.server</td><td>Hayır</td><td>Hayır</td><td>Sunucu istek kuyruğu – tüm istemci mesajları buraya gelir</td></tr>
+<tr><td>paint.client.{uuid}</td><td>Evet</td><td>Evet</td><td>İstemci yanıt kuyruğu – bağlantı kopunca silinir</td></tr>
+</table>
+
+<h3>4.4 AMQP Mesaj Başlıkları (İstemci → Sunucu)</h3>
+<table>
+<tr><th>Başlık</th><th>Tür</th><th>Ne Zaman Mevcut</th><th>Açıklama</th></tr>
+<tr><td>replyTo</td><td>String</td><td>Her zaman</td><td>İstemcinin paint.client.{uuid} kuyruk adı</td></tr>
+<tr><td>sessionId</td><td>int</td><td>LOGIN_OK sonrası</td><td>Sunucunun atadığı oturum kimliği</td></tr>
+</table>
+
+<h3>4.5 Mesaj Tipi → Dağıtım Eşleme</h3>
+<table>
+<tr><th>Mesaj Tipi</th><th>Socket Modunda</th><th>MQ Modunda</th></tr>
+<tr><td>USER_JOIN, USER_LEAVE</td><td>Tüm oturumlara writeQueue</td><td>paint.global fanout exchange</td></tr>
+<tr><td>FILE_LIST_RESP (yayın)</td><td>Tüm oturumlara writeQueue</td><td>paint.global fanout exchange</td></tr>
+<tr><td>DRAW_BROADCAST</td><td>Dosya görüntüleyicilere writeQueue (gönderici hariç)</td><td>Doğrudan kuyruğa (gönderici hariç)</td></tr>
+<tr><td>CANVAS_UPDATE</td><td>Dosya görüntüleyicilere writeQueue</td><td>Doğrudan kuyruğa (gönderici hariç)</td></tr>
+<tr><td>Diğer tüm yanıtlar</td><td>Oturumun writeQueue'suna</td><td>paint.client.{uuid} doğrudan kuyruğa</td></tr>
+</table>
+
+<!-- ================================================================== -->
+<h2>5. Canlı Tutma (Keepalive)</h2>
+
+<table>
+<tr><th>Parametre</th><th>Değer</th></tr>
+<tr><td>PING aralığı (istemci)</td><td>30 saniye</td></tr>
+<tr><td>Zaman aşımı (sunucu)</td><td>90 saniye (son PING/mesaj alındıktan itibaren)</td></tr>
+<tr><td>Zaman aşımı davranışı</td><td>Oturum kapatılır; USER_LEAVE yayını yapılır</td></tr>
+</table>
+
+<!-- ================================================================== -->
+<h2>6. Otomatik Kaydetme (AutoSave)</h2>
+
+<ul>
+<li>Sunucu 60 saniyede bir tüm açık dosyalar için disk yazısı tetikler.</li>
+<li>Yazı tamamlandıktan sonra <code>AUTOSAVE_NOTIFY</code> o dosyayı açan tüm istemcilere gönderilir.</li>
+<li>İstemcilerin isteğe bağlı olarak anlık görüntü göndermesi gerekmez;
+    sunucu son bilinen piksel verisini diske yazar.</li>
+</ul>
+
+<!-- ================================================================== -->
+<h2>7. Tuval Senkronizasyonu (Yeni Kullanıcı Katılımı)</h2>
+
+<ol>
+<li>İstemci B, açık dosyayı <code>FILE_OPEN_REQ</code> ile ister.</li>
+<li>Sunucu, aynı dosyayı başka istemcinin açtığını tespit eder.</li>
+<li>Sunucu, mevcut istemciye <code>CANVAS_SNAPSHOT_REQ</code> gönderir.</li>
+<li>Mevcut istemci, <code>CANVAS_SNAPSHOT_DATA</code> ile güncel piksel verisini yanıtlar.</li>
+<li>Sunucu, veriyi <code>FILE_OPEN_DATA</code> olarak yeni istemci B'ye iletir.</li>
+<li>Aynı zamanda tüm diğer görüntüleyicilere <code>CANVAS_UPDATE</code> yayını yapılır.</li>
+</ol>
+
+<!-- ================================================================== -->
+<h2>8. Hata İşleme</h2>
+
+<table>
+<tr><th>Durum</th><th>Sunucu Davranışı</th><th>İstemci Davranışı</th></tr>
+<tr><td>Geçersiz sihirli sayı</td><td>Oturumu kapat, ERROR gönder</td><td>Bağlantıyı kes</td></tr>
+<tr><td>Çok büyük payload (&gt;10 MB)</td><td>Oturumu kapat</td><td>Bağlantıyı kes</td></tr>
+<tr><td>Bilinmeyen mesaj tipi</td><td>Oturumu kapat</td><td>Uyarı logla</td></tr>
+<tr><td>Yetkisiz işlem (sahip değil)</td><td>ERROR mesajı gönder</td><td>GUI uyarısı göster</td></tr>
+<tr><td>Broker bağlantı kopması (MQ)</td><td>amqp-client otomatik yeniden bağlanır</td><td>amqp-client otomatik yeniden bağlanır</td></tr>
+<tr><td>Keepalive zaman aşımı</td><td>Oturum silinir, USER_LEAVE yayını</td><td>–</td></tr>
+</table>
+
+<!-- ================================================================== -->
+<h2>9. Kapsam Dışı</h2>
+<ul>
+<li>Geniş ölçekli performans karşılaştırması (benchmark)</li>
+<li>İleri düzey gözlemlenebilirlik (Prometheus, Grafana, Jaeger)</li>
+<li>GUI yeniden tasarımı</li>
+<li>TLS/mTLS broker şifreleme (yapılandırılabilir, varsayılan devre dışı)</li>
+</ul>
+
+<hr/>
+<p style="font-size:0.85em;color:#888;">
+MultiUserPaint – Ağ ve İletişim Teknolojileri Projesi
+</p>
+</body>
+</html>
